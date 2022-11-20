@@ -1,6 +1,6 @@
 use poise::serenity_prelude as serenity;
-use std::process::Command;
 use rand::prelude::*;
+use std::process::Command;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
@@ -72,21 +72,21 @@ async fn ping(
                     ctx.say("Nope, don't use IPv6 or mess with me").await?;
                     return Ok(())
                 }
-            }, 
+            },
             match address[1].parse::<u8>() {
                 Ok(a1) => a1,
                 Err(_) => {
                     ctx.say("Nope, don't use IPv6 or mess with me").await?;
                     return Ok(())
                 }
-            }, 
+            },
             match address[2].parse::<u8>() {
                 Ok(a2) => a2,
                 Err(_) => {
                     ctx.say("Nope, don't use IPv6 or mess with me").await?;
                     return Ok(())
                 }
-            }, 
+            },
             match address[3].parse::<u8>() {
                 Ok(a3) => a3,
                 Err(_) => {
@@ -163,8 +163,26 @@ async fn fumo(ctx: Context<'_>) -> Result<(), Error> {
     "NOT A FUMO (ᗜ_ᗜ)",
     "https://fumo.website/ <- nice stuff",
     "https://gift-gift.jp/ <- nice stuff"];
-    let message = messages.choose(&mut rand::thread_rng()).unwrap().to_string();
+    let message = messages
+        .choose(&mut rand::thread_rng())
+        .unwrap()
+        .to_string();
     ctx.say(message).await?;
+    Ok(())
+}
+
+/// Show a help menu
+#[poise::command(slash_command, prefix_command, track_edits)]
+async fn help(
+    ctx: Context<'_>,
+    #[description = "Specific command to show help about"] command: Option<String>,
+) -> Result<(), Error> {
+    poise::builtins::help(
+        ctx,
+        command.as_deref(),
+        poise::builtins::HelpConfiguration::default(),
+    )
+    .await?;
     Ok(())
 }
 
@@ -178,7 +196,7 @@ async fn register(ctx: Context<'_>) -> Result<(), Error> {
 async fn main() {
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![age(), say(), 早安(), ping(), neofetch(), fumo(), register()],
+            commands: vec![age(), say(), 早安(), ping(), neofetch(), fumo(), help(), register()],
             ..Default::default()
         })
         .token(std::env::var("DISCORD_TOKEN").expect("missing DISCORD_TOKEN"))
