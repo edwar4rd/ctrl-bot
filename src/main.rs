@@ -20,14 +20,18 @@ async fn age(
 }
 
 /// Make the bot say something
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(slash_command)]
 async fn say(
     ctx: Context<'_>,
     #[description = "Something"]
     #[rest]
     something: String,
 ) -> Result<(), Error> {
-    ctx.say(something).await?;
+    ctx.defer_ephemeral().await?;
+    ctx.say("Your message is being sent...").await?;
+    ctx.channel_id().send_message(ctx.discord(), |m| {
+        m.content(&something)
+    }).await?;
     Ok(())
 }
 
