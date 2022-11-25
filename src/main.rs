@@ -7,6 +7,14 @@ type Context<'a> = poise::Context<'a, Data, Error>;
 // User data, which is stored and accessible in all command invocations
 struct Data {}
 
+#[poise::command(slash_command, prefix_command)]
+async fn botinfo(
+    ctx: Context<'_>,
+) -> Result<(), Error> {
+    ctx.say("version = 0.0.4\nlast-update ~= 20221125 20:45").await?;
+    Ok(())
+}
+
 /// Displays your or another user's account creation date
 #[poise::command(slash_command, prefix_command)]
 async fn age(
@@ -42,6 +50,7 @@ async fn 早安(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+/*
 /// Make the bot ping to somewhere four times
 #[poise::command(slash_command, prefix_command)]
 async fn ping(
@@ -54,7 +63,7 @@ async fn ping(
         String::from_utf8_lossy(
             &Command::new("sh")
                 .arg("-c")
-                .env("PASSWORD", "phrase drift yiss ektjed displays jour yiyq")
+                // .env("PASSWORD", "phrase drift yiss ektjed displays jour yiyq")
                 .env("DISCORD_UID", ctx.author().id.to_string())
                 .env("BOT_COMMAND", "ping")
                 .arg("echo $BOT_COMMAND $(date +%s | cut -c-8) $DISCORD_UID $PASSWORD | sha512sum | cut -c-128")
@@ -113,7 +122,9 @@ async fn ping(
     ctx.say(response).await?;
     Ok(())
 }
+*/
 
+/*
 /// Prints system information output by neofetch
 #[poise::command(slash_command, prefix_command)]
 async fn neofetch(
@@ -150,6 +161,7 @@ async fn neofetch(
     ctx.say(response).await?;
     Ok(())
 }
+*/
 
 /// Get a random fumo related message from the bot
 #[poise::command(slash_command, prefix_command)]
@@ -200,7 +212,7 @@ async fn register(ctx: Context<'_>) -> Result<(), Error> {
 async fn main() {
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![age(), say(), 早安(), ping(), neofetch(), fumo(), help(), register()],
+            commands: vec![botinfo(), age(), say(), 早安(), /*ping(), neofetch(), */fumo(), help(), register()],
             ..Default::default()
         })
         .token(std::env::var("DISCORD_TOKEN").expect("missing DISCORD_TOKEN"))
