@@ -1,6 +1,10 @@
-use poise::{serenity_prelude as serenity, Context::{Application, Prefix}};
+use poise::{
+    serenity_prelude as serenity,
+    Context::{Application, Prefix},
+};
 use rand::prelude::*;
-use std::process::Command;
+use std::time::Duration;
+// use std::process::Command;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
@@ -197,6 +201,142 @@ async fn fumo(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+/// Test command that require a string input
+#[poise::command(slash_command)]
+async fn test_input(ctx: Context<'_>) -> Result<(), Error> {
+    let number_a = rand::thread_rng().gen_range(1000..10000);
+    let number_b = rand::thread_rng().gen_range(1000..10000);
+    let reply = ctx
+        .send(|msg| {
+            msg.content(format!("{} + {} = ?", number_a, number_b))
+                .components(|comp| {
+                    comp.create_action_row(|row| {
+                        row.create_button(|btn| {
+                            btn.custom_id("test_input.submit_btn")
+                                .style(serenity::ButtonStyle::Primary)
+                                .label("submit an answer")
+                        })
+                    })
+                })
+        })
+        .await?;
+
+    let mut msg = reply.into_message().await?;
+    let react = match msg
+        .await_component_interaction(&ctx)
+        .timeout(Duration::from_secs(10))
+        .await
+    {
+        Some(react) => react,
+        None => {
+            msg.edit(&ctx, |m| m.components(|c| c)).await.unwrap();
+            return Ok(());
+        }
+    };
+    msg.edit(&ctx, |m| m.components(|c| c)).await.unwrap();
+    if react.user.id == ctx.author().id {
+        react
+            .create_interaction_response(&ctx, |r| {
+                r.kind(serenity::InteractionResponseType::Modal);
+                r.interaction_response_data(|d| {
+                    d.custom_id("test_input.modal");
+                    d.title("1+1 = ?");
+                    d.components(|c| {
+                        c.create_action_row(|ar| {
+                            ar.create_input_text(|it| {
+                                it.style(serenity::InputTextStyle::Short)
+                                    .required(true)
+                                    .custom_id("test_input.modal.answer")
+                                    .label("answer")
+                            })
+                        })
+                    })
+                })
+            })
+            .await
+            .unwrap();
+
+        match msg
+            .await_modal_interaction(&ctx)
+            .timeout(Duration::from_secs(10))
+            .await
+        {
+            Some(react) => {
+                if react.user.id == ctx.author().id {
+                    if let serenity::ActionRowComponent::InputText(text) =
+                        &react.data.components[0].components[0]
+                    {
+                        if let Ok(answer) = text.value.trim().parse::<u32>() {
+                            if answer == number_a + number_b {
+                                react
+                                    .create_interaction_response(&ctx, |response| {
+                                        response
+                                    .kind(
+                                        serenity::InteractionResponseType::ChannelMessageWithSource,
+                                    )
+                                    .interaction_response_data(|msg| msg.content("Nice"))
+                                    })
+                                    .await?;
+                                Ok(())
+                            } else {
+                                react
+                                    .create_interaction_response(&ctx, |response| {
+                                        response
+                                    .kind(
+                                        serenity::InteractionResponseType::ChannelMessageWithSource,
+                                    )
+                                    .interaction_response_data(|msg| msg.content("Stoopid"))
+                                    })
+                                    .await?;
+                                Ok(())
+                            }
+                        } else {
+                            react
+                                .create_interaction_response(&ctx, |response| {
+                                    response
+                                    .kind(
+                                        serenity::InteractionResponseType::ChannelMessageWithSource,
+                                    )
+                                    .interaction_response_data(|msg| {
+                                        msg.content("Can't you type number properly?")
+                                    })
+                                })
+                                .await?;
+                            Ok(())
+                        }
+                    } else {
+                        unreachable!();
+                    }
+                } else {
+                    react
+                        .create_interaction_response(&ctx, |response| {
+                            response
+                                .kind(serenity::InteractionResponseType::ChannelMessageWithSource)
+                                .interaction_response_data(|msg| msg.content("No cheating!"))
+                        })
+                        .await?;
+                    Ok(())
+                }
+            }
+            None => {
+                react
+                    .create_followup_message(&ctx, |msg| msg.content("You're thinking too slow"))
+                    .await?;
+                Ok(())
+            }
+        }
+    } else {
+        react
+            .create_interaction_response(&ctx, |response| {
+                response
+                    .kind(serenity::InteractionResponseType::ChannelMessageWithSource)
+                    .interaction_response_data(|msg| msg.content("Type your own command!"))
+            })
+            .await?;
+        Ok(())
+    }
+}
+
 /// Show a help menu
 #[poise::command(slash_command, prefix_command)]
 async fn help(
@@ -222,6 +362,7 @@ async fn main() {
                 say(),
                 早安(),
                 /*ping(), neofetch(), */ fumo(),
+                test_input(),
                 help(),
             ],
             ..Default::default()
