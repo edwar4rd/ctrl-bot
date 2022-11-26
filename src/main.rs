@@ -1,4 +1,4 @@
-use poise::serenity_prelude as serenity;
+use poise::{serenity_prelude as serenity, Context::{Application, Prefix}};
 use rand::prelude::*;
 use std::process::Command;
 
@@ -27,19 +27,30 @@ async fn age(
 }
 
 /// Make the bot say something
-#[poise::command(slash_command)]
+#[poise::command(slash_command, prefix_command)]
 async fn say(
     ctx: Context<'_>,
     #[description = "Something"]
     #[rest]
     something: String,
 ) -> Result<(), Error> {
-    ctx.defer_ephemeral().await?;
-    ctx.say("Your message is being sent...").await?;
-    ctx.channel_id()
-        .send_message(ctx, |m| m.content(&something))
-        .await?;
-    Ok(())
+    match ctx {
+        Application(_) => {
+            ctx.defer_ephemeral().await?;
+            ctx.say("Your message is being sent...").await?;
+            ctx.channel_id()
+                .send_message(ctx, |m| m.content(&something))
+                .await?;
+            Ok(())
+        }
+        Prefix(prefix_context) => {
+            prefix_context.msg.delete(ctx).await?;
+            ctx.channel_id()
+                .send_message(ctx, |m| m.content(&something))
+                .await?;
+            Ok(())
+        }
+    }
 }
 
 /// Make the bot say 早安
@@ -187,7 +198,7 @@ async fn fumo(ctx: Context<'_>) -> Result<(), Error> {
 }
 
 /// Show a help menu
-#[poise::command(slash_command, prefix_command, track_edits)]
+#[poise::command(slash_command, prefix_command)]
 async fn help(
     ctx: Context<'_>,
     #[description = "Specific command to show help about"] command: Option<String>,
