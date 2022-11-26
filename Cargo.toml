@@ -7,5 +7,5 @@ edition = "2021"
 
 [dependencies]
 rand = "0.8.5"
-poise = "0.4.1"
+poise = "0.5.0"
 tokio = { version = "1.4.0", features = ["rt-multi-thread", "process"] }

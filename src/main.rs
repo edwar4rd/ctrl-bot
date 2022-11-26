@@ -8,10 +8,9 @@ type Context<'a> = poise::Context<'a, Data, Error>;
 struct Data {}
 
 #[poise::command(slash_command, prefix_command)]
-async fn botinfo(
-    ctx: Context<'_>,
-) -> Result<(), Error> {
-    ctx.say("version = 0.0.4\nlast-update ~= 20221125 20:45").await?;
+async fn botinfo(ctx: Context<'_>) -> Result<(), Error> {
+    ctx.say("version = 0.0.5\nlast-update ~= 20221126 14:00")
+        .await?;
     Ok(())
 }
 
@@ -37,9 +36,9 @@ async fn say(
 ) -> Result<(), Error> {
     ctx.defer_ephemeral().await?;
     ctx.say("Your message is being sent...").await?;
-    ctx.channel_id().send_message(ctx.discord(), |m| {
-        m.content(&something)
-    }).await?;
+    ctx.channel_id()
+        .send_message(ctx, |m| m.content(&something))
+        .await?;
     Ok(())
 }
 
@@ -202,22 +201,28 @@ async fn help(
     Ok(())
 }
 
-#[poise::command(prefix_command)]
-async fn register(ctx: Context<'_>) -> Result<(), Error> {
-    poise::builtins::register_application_commands_buttons(ctx).await?;
-    Ok(())
-}
-
 #[tokio::main]
 async fn main() {
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![botinfo(), age(), say(), 早安(), /*ping(), neofetch(), */fumo(), help(), register()],
+            commands: vec![
+                botinfo(),
+                age(),
+                say(),
+                早安(),
+                /*ping(), neofetch(), */ fumo(),
+                help(),
+            ],
             ..Default::default()
         })
         .token(std::env::var("DISCORD_TOKEN").expect("missing DISCORD_TOKEN"))
         .intents(serenity::GatewayIntents::non_privileged())
-        .user_data_setup(move |_ctx, _ready, _framework| Box::pin(async move { Ok(Data {}) }));
+        .setup(move |ctx, _ready, framework| {
+            Box::pin(async move {
+                poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                Ok(Data {})
+            })
+        });
 
     framework.run().await.unwrap();
 }
