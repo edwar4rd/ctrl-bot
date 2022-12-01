@@ -1,15 +1,226 @@
+use base64;
 use poise::{
     serenity_prelude as serenity,
     Context::{Application, Prefix},
 };
 use rand::prelude::*;
-use std::time::Duration;
-// use std::process::Command;
+use rsa::{pkcs8::DecodePublicKey, PaddingScheme, PublicKey};
+use std::iter;
+// use sha3::{Digest, Sha3_512};
+use poise::ApplicationCommandOrAutocompleteInteraction;
+use std::process::Command;
+use std::time::{Duration, *};
+use dc_bot::ResponsibleInteraction;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 // User data, which is stored and accessible in all command invocations
 struct Data {}
+
+async fn authenticate<'a>(
+    ctx: &serenity::Context,
+    interaction: ResponsibleInteraction<'a>,
+    action_data: &str,
+) -> Result<bool, Error> {
+    let challenge_random = iter::repeat_with(|| thread_rng().gen::<u8>())
+        .take(192)
+        .collect::<Vec<u8>>();
+    let challenge_encoded = format!(
+        "{}_{}_{}\n",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis(),
+        base64::encode(&challenge_random),
+        action_data /*
+                    base64::encode({
+                        let mut hasher = Sha3_512::new();
+                        hasher.update(action_data);
+                        hasher.update(challenge_random);
+                        hasher.finalize()
+                    })*/
+    );
+
+    interaction.create_interaction_response(&ctx, |response| response
+        .kind(serenity::InteractionResponseType::ChannelMessageWithSource)
+        .interaction_response_data(|msg| msg
+            .ephemeral(true)
+            .content(format!("Please authenticate by signing this random message(including the newline) with your secret key:\n```{challenge_encoded}```\n\n```openssl rsautl -sign -inkey privkey.pem | openssl enc -base64```"))
+            .components(|components| components
+                .create_action_row(|row| row
+                    .create_button(|btn| btn
+                        .custom_id("authenticate.button")
+                        .label("Submit signed")
+                        .style(serenity::ButtonStyle::Primary)
+                    )
+                )
+            ))
+        ).await?;
+
+    let btn_reply = interaction.get_interaction_response(&ctx).await?;
+
+    let btn_reply_react = match btn_reply
+        .await_component_interaction(&ctx)
+        .timeout(Duration::from_secs(60))
+        .await
+    {
+        Some(react) => react,
+        None => {
+            interaction
+                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("(Too slow!)"))
+                .await?;
+            return Ok(false);
+        }
+    };
+
+    btn_reply_react
+        .create_interaction_response(&ctx, |response| {
+            response
+                .kind(serenity::InteractionResponseType::Modal)
+                .interaction_response_data(|modal| {
+                    modal
+                        .custom_id("authenticate.modal")
+                        .title("Submit signed message to authenticate")
+                        .components(|component| {
+                            component.create_action_row(|action_row| {
+                                action_row.create_input_text(|input_text| {
+                                    input_text
+                                        .style(serenity::InputTextStyle::Paragraph)
+                                        .required(true)
+                                        .custom_id("authenticate.modal.signed")
+                                        .label("signed message")
+                                })
+                            })
+                        })
+                })
+        })
+        .await?;
+
+    let modal_reply_react = match btn_reply
+        .await_modal_interaction(&ctx)
+        .timeout(Duration::from_secs(60))
+        .await
+    {
+        Some(react) => react,
+        None => {
+            btn_reply_react
+                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("(Too slow!)"))
+                .await?;
+            return Ok(false);
+        }
+    };
+
+    if let serenity::ActionRowComponent::InputText(text) =
+        &modal_reply_react.data.components[0].components[0]
+    {
+        if let Ok(signed) = base64::decode(
+            &text
+                .value
+                .trim()
+                .as_bytes()
+                .into_iter()
+                .filter(|c| !c.is_ascii_whitespace())
+                .map(|x| *x)
+                .collect::<Vec<u8>>(),
+        ) {
+            if rsa::RsaPublicKey::from_public_key_pem(
+                "-----BEGIN PUBLIC KEY-----
+MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAo7/fmoTQhWboiCHpuGF3
+DmAmyeTZEvaGvAKzUeabnds9iA0UCCm5kPRKK0kWGj/xpBJxzyCRzxUvKvPtY02/
+s8DdY/EMBcJOPLvd+VbGJsrSVkQnD5SmexyRuioZ2byFSPUFYZ5sNQzdI08XP4J2
+ttI6jiu61cIO5JvPfjTntO40/dmpyb8olf/6Nifc62NnV8JGEsnTrd3QdrjCo3vj
+t73FEKCccAJfJQtLZo5AFFLZpjTcXvEd1BucHf15qO0cu05toV7l/HICpupm9G2e
+Q92bn2KN5zondTJRHo+xrTWVGUx0KH8WX/XdbsC1l6BfB7KIwL9rhMVDBtmCSBAI
+7N6KGxGbLo22d7kEMKTWrxtz2fDUVysVgooAvbeeYQGfsmLoLB4Dyi33vGQFjwMs
+bIElmgKQRubiCzwZ3EblFLIiEREMUZBwZQrLK2u92d7CE63wWoJEKIFBUJQo+ZJv
+zkPogJ6VP7kLZCb0cbxTSobJtfrWFbWCHoF1WbbLktTw9b6dfn4PYv8oTZnukVFr
+fGoE3XHvnuRa+SAkf0GafMSU3k+htCqBqIAqLRcRxc8lr+9ejOExBobh8ElNu+os
+UmGJIty1t2qxNhtizyengaVjbNK9loSD2yzxS1wPR3jF68ztKkgmcnxEPH2Iq1zy
+Dy7uxt3qNoJykUCNUqlNBNUCAwEAAQ==
+-----END PUBLIC KEY-----
+",
+            )
+            .unwrap()
+            .verify(
+                PaddingScheme::new_pkcs1v15_sign_raw(),
+                &challenge_encoded.as_bytes(),
+                &signed,
+            )
+            .is_ok()
+            {
+                modal_reply_react
+                    .create_interaction_response(&ctx, |response| {
+                        response
+                            .kind(serenity::InteractionResponseType::ChannelMessageWithSource)
+                            .interaction_response_data(|msg| {
+                                msg.ephemeral(true).content("(Authentication Succeeded!)")
+                            })
+                    })
+                    .await?;
+                Ok(true)
+            } else {
+                modal_reply_react
+                    .create_interaction_response(&ctx, |response| {
+                        response
+                            .kind(serenity::InteractionResponseType::ChannelMessageWithSource)
+                            .interaction_response_data(|msg| {
+                                msg.ephemeral(true).content("(Authentication Failed!)")
+                            })
+                    })
+                    .await?;
+                Ok(false)
+            }
+        } else {
+            modal_reply_react
+                .create_interaction_response(&ctx, |response| {
+                    response
+                        .kind(serenity::InteractionResponseType::ChannelMessageWithSource)
+                        .interaction_response_data(|msg| {
+                            msg.ephemeral(true)
+                                .content("(Failed to parse responsed message)")
+                        })
+                })
+                .await?;
+            Ok(false)
+        }
+    } else {
+        unreachable!();
+    }
+}
+
+async fn handler(
+    ctx: &serenity::Context,
+    event: &poise::Event<'_>,
+    _data: &Data,
+) -> Result<(), Error> {
+    match event {
+        poise::Event::InteractionCreate { interaction } => match interaction.kind() {
+            serenity::InteractionType::MessageComponent => {
+                let interaction = interaction.clone().message_component().unwrap();
+                match interaction.data.component_type {
+                    serenity::ComponentType::Button => {
+                        if interaction.data.custom_id == "test_auth.auth_btn" {
+                            if authenticate(ctx, ResponsibleInteraction::MessageComponent(&interaction), "test_auth").await? {
+                                interaction
+                                    .create_followup_message(&ctx, |msg| msg.content("(ᗜˬᗜ)"))
+                                    .await?;
+                            } else {
+                                interaction
+                                    .create_followup_message(&ctx, |msg| msg.content("(ᗜ˰ᗜ)"))
+                                    .await?;
+                            }
+                            return Ok(());
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        },
+        _ => {}
+    }
+    Ok(())
+}
 
 #[poise::command(slash_command, prefix_command)]
 async fn botinfo(ctx: Context<'_>) -> Result<(), Error> {
@@ -64,118 +275,151 @@ async fn 早安(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-/*
 /// Make the bot ping to somewhere four times
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(slash_command)]
 async fn ping(
     ctx: Context<'_>,
-    #[description = "echo neofetch $(date +%s | cut -c-8) $DISCORD_UID $PASSWORD | sha512sum | cut -c-128"]
-    passcode: String,
     #[description = "something.something.something.something"] address: String,
 ) -> Result<(), Error> {
-    let response = if passcode.trim().starts_with(
-        String::from_utf8_lossy(
-            &Command::new("sh")
-                .arg("-c")
-                // .env("PASSWORD", "phrase drift yiss ektjed displays jour yiyq")
-                .env("DISCORD_UID", ctx.author().id.to_string())
-                .env("BOT_COMMAND", "ping")
-                .arg("echo $BOT_COMMAND $(date +%s | cut -c-8) $DISCORD_UID $PASSWORD | sha512sum | cut -c-128")
-                .output()
-                .expect("Failed to hash user passcode")
-                .stdout,
-        )
-        .trim(),
-    ) {
-        let address = address.trim().split(".").collect::<Vec<&str>>();
-        if address.len() != 4 {
-            ctx.say("Nope, don't use IPv6 or mess with me").await?;
-            return Ok(())
-        }
-        let address = (
-            match address[0].parse::<u8>() {
-                Ok(a0) => a0,
-                Err(_) => {
-                    ctx.say("Nope, don't use IPv6 or mess with me").await?;
-                    return Ok(())
-                }
-            },
-            match address[1].parse::<u8>() {
-                Ok(a1) => a1,
-                Err(_) => {
-                    ctx.say("Nope, don't use IPv6 or mess with me").await?;
-                    return Ok(())
-                }
-            },
-            match address[2].parse::<u8>() {
-                Ok(a2) => a2,
-                Err(_) => {
-                    ctx.say("Nope, don't use IPv6 or mess with me").await?;
-                    return Ok(())
-                }
-            },
-            match address[3].parse::<u8>() {
-                Ok(a3) => a3,
-                Err(_) => {
-                    ctx.say("Nope, don't use IPv6 or mess with me").await?;
-                    return Ok(())
-                }
+    let interaction = match &ctx {
+        Application(application_context) => match application_context.interaction {
+            ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(interaction) => {
+                interaction
             }
-        );
+            _ => {
+                unreachable!()
+            }
+        },
+        _ => {
+            unreachable!();
+        }
+    };
+
+    let address = address.trim().split(".").collect::<Vec<&str>>();
+    if address.len() != 4 {
+        ctx.say("Nope, don't use IPv6 or mess with me").await?;
+        return Ok(());
+    }
+    let address = (
+        match address[0].parse::<u8>() {
+            Ok(a0) => a0,
+            Err(_) => {
+                interaction
+                    .create_followup_message(&ctx, |msg| {
+                        msg.ephemeral(true)
+                            .content("Nope, don't use IPv6 or mess with me")
+                    })
+                    .await?;
+                return Ok(());
+            }
+        },
+        match address[1].parse::<u8>() {
+            Ok(a1) => a1,
+            Err(_) => {
+                interaction
+                    .create_followup_message(&ctx, |msg| {
+                        msg.ephemeral(true)
+                            .content("Nope, don't use IPv6 or mess with me")
+                    })
+                    .await?;
+                return Ok(());
+            }
+        },
+        match address[2].parse::<u8>() {
+            Ok(a2) => a2,
+            Err(_) => {
+                interaction
+                    .create_followup_message(&ctx, |msg| {
+                        msg.ephemeral(true)
+                            .content("Nope, don't use IPv6 or mess with me")
+                    })
+                    .await?;
+                return Ok(());
+            }
+        },
+        match address[3].parse::<u8>() {
+            Ok(a3) => a3,
+            Err(_) => {
+                interaction
+                    .create_followup_message(&ctx, |msg| {
+                        msg.ephemeral(true)
+                            .content("Nope, don't use IPv6 or mess with me")
+                    })
+                    .await?;
+                return Ok(());
+            }
+        },
+    );
+
+    let response = if authenticate(
+        &ctx.serenity_context(),
+        ResponsibleInteraction::ApplicationCommand(interaction),
+        &format!(
+            "ping_{}_{}_{}_{}",
+            address.0, address.1, address.2, address.3
+        ),
+    )
+    .await?
+    {
         String::from_utf8_lossy(
             &Command::new("sh")
                 .arg("-c")
-                .arg(format!("ping -c1 {}.{}.{}.{}", address.0, address.1, address.2, address.3))
+                .arg(format!(
+                    "ping -c1 {}.{}.{}.{}",
+                    address.0, address.1, address.2, address.3
+                ))
                 .output()
                 .expect("Failed to get system information")
                 .stdout,
-        ).to_string()
+        )
+        .to_string()
     } else {
         "Nope, wrong passcode lol\n".to_string()
     };
-    ctx.say(response).await?;
+    interaction
+        .create_followup_message(&ctx, |msg| msg.ephemeral(true).content(response))
+        .await?;
     Ok(())
 }
-*/
 
-/*
 /// Prints system information output by neofetch
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(slash_command)]
 async fn neofetch(
     ctx: Context<'_>,
-    #[description = "echo neofetch $(date +%s | cut -c-8) $DISCORD_UID $PASSWORD | sha512sum | cut -c-128"]
-    passcode: String,
     // #[description = "Selected user"] user: Option<serenity::User>,
 ) -> Result<(), Error> {
-    let response = if passcode.trim().starts_with(
-        String::from_utf8_lossy(
-            &Command::new("sh")
-                .arg("-c")
-                .env("PASSWORD", "phrase drift yiss ektjed displays jour yiyq")
-                .env("DISCORD_UID", ctx.author().id.to_string())
-                .env("BOT_COMMAND", "neofetch")
-                .arg("echo $BOT_COMMAND $(date +%s | cut -c-8) $DISCORD_UID $PASSWORD | sha512sum | cut -c-128")
-                .output()
-                .expect("Failed to hash user passcode")
-                .stdout,
-        )
-        .trim(),
-    ) {
-        String::from_utf8_lossy(
-            &Command::new("sh")
-                .arg("-c")
-                .arg("neofetch --stdout")
-                .output()
-                .expect("Failed to get system information")
-                .stdout,
-        ).to_string()
-    } else {
-        "Nope, wrong passcode lol\n".to_string()
+    let interaction = match &ctx {
+        Application(application_context) => match application_context.interaction {
+            ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(interaction) => {
+                interaction
+            }
+            _ => {
+                unreachable!()
+            }
+        },
+        _ => {
+            unreachable!();
+        }
     };
-    ctx.say(response).await?;
+    let response =
+        if authenticate(&ctx.serenity_context(), ResponsibleInteraction::ApplicationCommand(interaction), "neofetch").await? {
+            String::from_utf8_lossy(
+                &Command::new("sh")
+                    .arg("-c")
+                    .arg("neofetch --stdout")
+                    .output()
+                    .expect("Failed to get system information")
+                    .stdout,
+            )
+            .to_string()
+        } else {
+            "Nope, wrong passcode lol\n".to_string()
+        };
+    interaction
+        .create_followup_message(&ctx, |msg| msg.ephemeral(true).content(response))
+        .await?;
     Ok(())
 }
-*/
 
 /// Get a random fumo related message from the bot
 #[poise::command(slash_command, prefix_command)]
@@ -237,21 +481,21 @@ async fn test_input(ctx: Context<'_>) -> Result<(), Error> {
     if react.user.id == ctx.author().id {
         react
             .create_interaction_response(&ctx, |r| {
-                r.kind(serenity::InteractionResponseType::Modal);
-                r.interaction_response_data(|d| {
-                    d.custom_id("test_input.modal");
-                    d.title("1+1 = ?");
-                    d.components(|c| {
-                        c.create_action_row(|ar| {
-                            ar.create_input_text(|it| {
-                                it.style(serenity::InputTextStyle::Short)
-                                    .required(true)
-                                    .custom_id("test_input.modal.answer")
-                                    .label("answer")
+                r.kind(serenity::InteractionResponseType::Modal)
+                    .interaction_response_data(|d| {
+                        d.custom_id("test_input.modal")
+                            .title("1+1 = ?")
+                            .components(|component| {
+                                component.create_action_row(|ar| {
+                                    ar.create_input_text(|it| {
+                                        it.style(serenity::InputTextStyle::Short)
+                                            .required(true)
+                                            .custom_id("test_input.modal.answer")
+                                            .label("answer")
+                                    })
+                                })
                             })
-                        })
                     })
-                })
             })
             .await
             .unwrap();
@@ -337,6 +581,24 @@ async fn test_input(ctx: Context<'_>) -> Result<(), Error> {
     }
 }
 
+/// Test function that require authentication
+#[poise::command(slash_command)]
+async fn test_auth(ctx: Context<'_>) -> Result<(), Error> {
+    ctx.send(|msg| {
+        msg.content("Click to authenticate").components(|comp| {
+            comp.create_action_row(|row| {
+                row.create_button(|btn| {
+                    btn.custom_id("test_auth.auth_btn")
+                        .style(serenity::ButtonStyle::Primary)
+                        .label("Authenticate!")
+                })
+            })
+        })
+    })
+    .await?;
+    Ok(())
+}
+
 /// Show a help menu
 #[poise::command(slash_command, prefix_command)]
 async fn help(
@@ -361,10 +623,14 @@ async fn main() {
                 age(),
                 say(),
                 早安(),
-                /*ping(), neofetch(), */ fumo(),
+                ping(),
+                neofetch(),
+                fumo(),
                 test_input(),
+                test_auth(),
                 help(),
             ],
+            event_handler: |ctx, event, _framework, data| Box::pin(handler(ctx, event, data)),
             ..Default::default()
         })
         .token(std::env::var("DISCORD_TOKEN").expect("missing DISCORD_TOKEN"))
