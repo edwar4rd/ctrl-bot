@@ -5,12 +5,12 @@ use poise::{
 };
 use rand::prelude::*;
 use rsa::{pkcs8::DecodePublicKey, PaddingScheme, PublicKey};
-use std::iter;
+use std::{iter, net::Ipv4Addr};
 // use sha3::{Digest, Sha3_512};
+use dc_bot::ResponsibleInteraction;
 use poise::ApplicationCommandOrAutocompleteInteraction;
 use std::process::Command;
 use std::time::{Duration, *};
-use dc_bot::ResponsibleInteraction;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
@@ -200,7 +200,13 @@ async fn handler(
                 match interaction.data.component_type {
                     serenity::ComponentType::Button => {
                         if interaction.data.custom_id == "test_auth.auth_btn" {
-                            if authenticate(ctx, ResponsibleInteraction::MessageComponent(&interaction), "test_auth").await? {
+                            if authenticate(
+                                ctx,
+                                ResponsibleInteraction::MessageComponent(&interaction),
+                                "test_auth",
+                            )
+                            .await?
+                            {
                                 interaction
                                     .create_followup_message(&ctx, |msg| msg.content("(ᗜˬᗜ)"))
                                     .await?;
@@ -279,7 +285,7 @@ async fn 早安(ctx: Context<'_>) -> Result<(), Error> {
 #[poise::command(slash_command)]
 async fn ping(
     ctx: Context<'_>,
-    #[description = "something.something.something.something"] address: String,
+    #[description = "a Ipv4 Adderss"] address: String,
 ) -> Result<(), Error> {
     let interaction = match &ctx {
         Application(application_context) => match application_context.interaction {
@@ -295,81 +301,36 @@ async fn ping(
         }
     };
 
-    let address = address.trim().split(".").collect::<Vec<&str>>();
-    if address.len() != 4 {
-        ctx.say("Nope, don't use IPv6 or mess with me").await?;
-        return Ok(());
-    }
-    let address = (
-        match address[0].parse::<u8>() {
-            Ok(a0) => a0,
-            Err(_) => {
-                interaction
-                    .create_followup_message(&ctx, |msg| {
-                        msg.ephemeral(true)
-                            .content("Nope, don't use IPv6 or mess with me")
-                    })
-                    .await?;
-                return Ok(());
-            }
-        },
-        match address[1].parse::<u8>() {
-            Ok(a1) => a1,
-            Err(_) => {
-                interaction
-                    .create_followup_message(&ctx, |msg| {
-                        msg.ephemeral(true)
-                            .content("Nope, don't use IPv6 or mess with me")
-                    })
-                    .await?;
-                return Ok(());
-            }
-        },
-        match address[2].parse::<u8>() {
-            Ok(a2) => a2,
-            Err(_) => {
-                interaction
-                    .create_followup_message(&ctx, |msg| {
-                        msg.ephemeral(true)
-                            .content("Nope, don't use IPv6 or mess with me")
-                    })
-                    .await?;
-                return Ok(());
-            }
-        },
-        match address[3].parse::<u8>() {
-            Ok(a3) => a3,
-            Err(_) => {
-                interaction
-                    .create_followup_message(&ctx, |msg| {
-                        msg.ephemeral(true)
-                            .content("Nope, don't use IPv6 or mess with me")
-                    })
-                    .await?;
-                return Ok(());
-            }
-        },
-    );
+    let address = match address.parse::<Ipv4Addr>() {
+        Ok(address) => address,
+        Err(_) => {
+            interaction
+                .create_interaction_response(&ctx, |response| {
+                    response
+                        .kind(serenity::InteractionResponseType::ChannelMessageWithSource)
+                        .interaction_response_data(|msg| {
+                            msg.ephemeral(true)
+                                .content("Given `address` isn't valid Ipv4 address!")
+                        })
+                })
+                .await?;
+            return Ok(());
+        }
+    };
 
     let response = if authenticate(
         &ctx.serenity_context(),
         ResponsibleInteraction::ApplicationCommand(interaction),
-        &format!(
-            "ping_{}_{}_{}_{}",
-            address.0, address.1, address.2, address.3
-        ),
+        &address.to_string(),
     )
     .await?
     {
         String::from_utf8_lossy(
             &Command::new("sh")
                 .arg("-c")
-                .arg(format!(
-                    "ping -c1 {}.{}.{}.{}",
-                    address.0, address.1, address.2, address.3
-                ))
+                .arg(format!("ping -c1 {}", address))
                 .output()
-                .expect("Failed to get system information")
+                .expect("Failed to perform ping command")
                 .stdout,
         )
         .to_string()
@@ -401,20 +362,26 @@ async fn neofetch(
             unreachable!();
         }
     };
-    let response =
-        if authenticate(&ctx.serenity_context(), ResponsibleInteraction::ApplicationCommand(interaction), "neofetch").await? {
-            String::from_utf8_lossy(
-                &Command::new("sh")
-                    .arg("-c")
-                    .arg("neofetch --stdout")
-                    .output()
-                    .expect("Failed to get system information")
-                    .stdout,
-            )
-            .to_string()
-        } else {
-            "Nope, wrong passcode lol\n".to_string()
-        };
+
+    let response = if authenticate(
+        &ctx.serenity_context(),
+        ResponsibleInteraction::ApplicationCommand(interaction),
+        "neofetch",
+    )
+    .await?
+    {
+        String::from_utf8_lossy(
+            &Command::new("sh")
+                .arg("-c")
+                .arg("neofetch --stdout")
+                .output()
+                .expect("Failed to get system information")
+                .stdout,
+        )
+        .to_string()
+    } else {
+        "Nope, wrong passcode lol\n".to_string()
+    };
     interaction
         .create_followup_message(&ctx, |msg| msg.ephemeral(true).content(response))
         .await?;
