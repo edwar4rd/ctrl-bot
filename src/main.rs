@@ -224,7 +224,7 @@ async fn handler(
 
 #[poise::command(slash_command, prefix_command)]
 async fn botinfo(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.say("version = 0.0.5\nlast-update ~= 20221126 14:00")
+    ctx.say("version = 0.0.6\nlast-update ~= 20221201 11:40 UTC+8")
         .await?;
     Ok(())
 }
