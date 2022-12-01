@@ -253,18 +253,133 @@ async fn say(
     ctx: Context<'_>,
     #[description = "Something"]
     #[rest]
-    something: String,
+    something: Option<String>,
 ) -> Result<(), Error> {
     match ctx {
         Application(_) => {
-            ctx.defer_ephemeral().await?;
-            ctx.say("Your message is being sent...").await?;
+            let something = match something {
+                Some(something) => {
+                    ctx.defer_ephemeral().await?;
+                    ctx.say("Your message is being sent...").await?;
+                    something
+                }
+                None => {
+                    let reply = ctx
+                        .send(|msg| {
+                            msg.content("Click this button to provide a message to be sent")
+                                .ephemeral(true)
+                                .components(|comp| {
+                                    comp.create_action_row(|row| {
+                                        row.create_button(|btn| {
+                                            btn.custom_id("say.submit_btn")
+                                                .style(serenity::ButtonStyle::Primary)
+                                                .label("submit a message")
+                                        })
+                                    })
+                                })
+                        })
+                        .await?;
+                    let react = match reply
+                        .message()
+                        .await?
+                        .await_component_interaction(&ctx)
+                        .timeout(Duration::from_secs(30))
+                        .await
+                    {
+                        Some(react) => react,
+                        None => {
+                            reply.edit(ctx, |m| m.components(|c| c)).await?;
+                            return Ok(());
+                        }
+                    };
+                    reply.edit(ctx, |m| m.components(|c| c)).await?;
+                    if react.user.id != ctx.author().id {
+                        react
+                            .create_interaction_response(&ctx, |response| {
+                                response
+                                    .kind(
+                                        serenity::InteractionResponseType::ChannelMessageWithSource,
+                                    )
+                                    .interaction_response_data(|msg| {
+                                        msg.ephemeral(true).content("Type your own command!")
+                                    })
+                            })
+                            .await?;
+                        return Ok(());
+                    }
+                    react
+                        .create_interaction_response(&ctx, |response| {
+                            response
+                                .kind(serenity::InteractionResponseType::Modal)
+                                .interaction_response_data(|d| {
+                                    d.custom_id("say.modal")
+                                        .title("message to be said")
+                                        .components(|component| {
+                                            component.create_action_row(|ar| {
+                                                ar.create_input_text(|it| {
+                                                    it.style(serenity::InputTextStyle::Paragraph)
+                                                        .required(true)
+                                                        .custom_id("say.modal.answer")
+                                                        .label("message")
+                                                })
+                                            })
+                                        })
+                                })
+                        })
+                        .await?;
+
+                    let react = match reply
+                        .message()
+                        .await?
+                        .await_modal_interaction(&ctx)
+                        .timeout(Duration::from_secs(240))
+                        .await
+                    {
+                        Some(react) => react,
+                        None => {
+                            return Ok(());
+                        }
+                    };
+
+                    if react.user.id == ctx.author().id {
+                        if let serenity::ActionRowComponent::InputText(text) =
+                            &react.data.components[0].components[0]
+                        {
+                            react
+                                    .create_interaction_response(&ctx, |response| {
+                                        response
+                                    .kind(
+                                        serenity::InteractionResponseType::ChannelMessageWithSource,
+                                    )
+                                    .interaction_response_data(|msg| msg.ephemeral(true).content("Your message is being sent..."))
+                                    })
+                                    .await?;
+                            text.value.clone()
+                        } else {
+                            unreachable!();
+                        }
+                    } else {
+                        react
+                            .create_interaction_response(&ctx, |response| {
+                                response
+                                    .kind(
+                                        serenity::InteractionResponseType::ChannelMessageWithSource,
+                                    )
+                                    .interaction_response_data(|msg| msg.content("No cheating!"))
+                            })
+                            .await?;
+                        return Ok(());
+                    }
+                }
+            };
+
             ctx.channel_id()
                 .send_message(ctx, |m| m.content(&something))
                 .await?;
             Ok(())
         }
         Prefix(prefix_context) => {
+            let something = something.unwrap_or("something".to_string());
             prefix_context.msg.delete(ctx).await?;
             ctx.channel_id()
                 .send_message(ctx, |m| m.content(&something))
@@ -338,7 +453,7 @@ async fn ping(
     let response = if authenticate(
         &ctx.serenity_context(),
         ResponsibleInteraction::ApplicationCommand(interaction),
-        &format!("{}_{}",count, address.to_string()),
+        &format!("{}_{}", count, address.to_string()),
     )
     .await?
     {
@@ -457,11 +572,11 @@ async fn test_input(ctx: Context<'_>) -> Result<(), Error> {
     {
         Some(react) => react,
         None => {
-            msg.edit(&ctx, |m| m.components(|c| c)).await.unwrap();
+            msg.edit(&ctx, |m| m.components(|c| c)).await?;
             return Ok(());
         }
     };
-    msg.edit(&ctx, |m| m.components(|c| c)).await.unwrap();
+    msg.edit(&ctx, |m| m.components(|c| c)).await?;
     if react.user.id == ctx.author().id {
         react
             .create_interaction_response(&ctx, |r| {
@@ -481,8 +596,7 @@ async fn test_input(ctx: Context<'_>) -> Result<(), Error> {
                             })
                     })
             })
-            .await
-            .unwrap();
+            .await?;
 
         match msg
             .await_modal_interaction(&ctx)
