@@ -5,7 +5,7 @@ use poise::{
 };
 use rand::prelude::*;
 use rsa::{pkcs8::DecodePublicKey, PaddingScheme, PublicKey};
-use std::{iter, net::Ipv4Addr};
+use std::{iter, net::IpAddr};
 // use sha3::{Digest, Sha3_512};
 use dc_bot::ResponsibleInteraction;
 use poise::ApplicationCommandOrAutocompleteInteraction;
@@ -281,11 +281,12 @@ async fn 早安(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-/// Make the bot ping to somewhere four times
+/// Make the bot ping to somewhere several times
 #[poise::command(slash_command)]
 async fn ping(
     ctx: Context<'_>,
-    #[description = "a Ipv4 Adderss"] address: String,
+    #[description = "a target IP adderss"] address: String,
+    #[description = "Stop after sending count ECHO_REQUEST packets.(<=50)"] count: Option<u8>,
 ) -> Result<(), Error> {
     let interaction = match &ctx {
         Application(application_context) => match application_context.interaction {
@@ -301,7 +302,23 @@ async fn ping(
         }
     };
 
-    let address = match address.parse::<Ipv4Addr>() {
+    let count: u8 = count.unwrap_or(4);
+
+    if count > 50 {
+        interaction
+            .create_interaction_response(&ctx, |response| {
+                response
+                    .kind(serenity::InteractionResponseType::ChannelMessageWithSource)
+                    .interaction_response_data(|msg| {
+                        msg.ephemeral(true)
+                            .content("Given `count` is greater than 50!")
+                    })
+            })
+            .await?;
+        return Ok(());
+    }
+
+    let address = match address.parse::<IpAddr>() {
         Ok(address) => address,
         Err(_) => {
             interaction
@@ -321,14 +338,14 @@ async fn ping(
     let response = if authenticate(
         &ctx.serenity_context(),
         ResponsibleInteraction::ApplicationCommand(interaction),
-        &address.to_string(),
+        &format!("{}_{}",count, address.to_string()),
     )
     .await?
     {
         String::from_utf8_lossy(
             &Command::new("sh")
                 .arg("-c")
-                .arg(format!("ping -c1 {}", address))
+                .arg(format!("ping -c{} {}", count, address))
                 .output()
                 .expect("Failed to perform ping command")
                 .stdout,
