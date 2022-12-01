@@ -468,7 +468,7 @@ async fn test_input(ctx: Context<'_>) -> Result<(), Error> {
                 r.kind(serenity::InteractionResponseType::Modal)
                     .interaction_response_data(|d| {
                         d.custom_id("test_input.modal")
-                            .title("1+1 = ?")
+                            .title(format!("{number_a}+{number_b} = ?"))
                             .components(|component| {
                                 component.create_action_row(|ar| {
                                     ar.create_input_text(|it| {
