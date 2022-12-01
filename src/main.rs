@@ -319,6 +319,7 @@ async fn say(
                                                 ar.create_input_text(|it| {
                                                     it.style(serenity::InputTextStyle::Paragraph)
                                                         .required(true)
+                                                        .max_length(2000)
                                                         .custom_id("say.modal.answer")
                                                         .label("message")
                                                 })
