@@ -230,7 +230,7 @@ async fn handler(
 
 #[poise::command(slash_command, prefix_command)]
 async fn botinfo(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.say("version = 0.0.6\nlast-update ~= 20221201 11:40 UTC+8")
+    ctx.say("version = 0.0.7\nlast-update ~= 20221201 23:30 UTC+8")
         .await?;
     Ok(())
 }
@@ -457,15 +457,45 @@ async fn ping(
     )
     .await?
     {
-        String::from_utf8_lossy(
-            &Command::new("sh")
-                .arg("-c")
-                .arg(format!("ping -c{} {}", count, address))
-                .output()
-                .expect("Failed to perform ping command")
-                .stdout,
-        )
-        .to_string()
+        match &Command::new("ping")
+            .arg("-i")
+            .arg("0.2")
+            .arg("-c")
+            .arg(count.to_string())
+            .arg(address.to_string())
+            .output()
+        {
+            Ok(output) => {
+                let response = String::from_utf8_lossy(&output.stdout).to_string();
+                if response.len() > 1990 {
+                    let mut lines = response.lines();
+                    let mut current = String::new();
+                    loop {
+                        match lines.next() {
+                            Some(line) => {
+                                if current.len() + line.len() > 1990 {
+                                    interaction
+                                        .create_followup_message(&ctx, |msg| {
+                                            msg.ephemeral(true)
+                                                .content(format!("```{}```", current))
+                                        })
+                                        .await?;
+                                    current.clear();
+                                }
+                                current.push('\n');
+                                current.push_str(line);
+                            }
+                            None => {
+                                break format!("```{}```", current);
+                            }
+                        }
+                    }
+                } else {
+                    format!("```{}```", response)
+                }
+            }
+            Err(_) => "Failed to perform ping command".to_string(),
+        }
     } else {
         "Nope, wrong passcode lol\n".to_string()
     };
@@ -502,15 +532,16 @@ async fn neofetch(
     )
     .await?
     {
-        String::from_utf8_lossy(
-            &Command::new("sh")
-                .arg("-c")
-                .arg("neofetch --stdout")
-                .output()
-                .expect("Failed to get system information")
-                .stdout,
+        format!(
+            "```{}```",
+            String::from_utf8_lossy(
+                &Command::new("neofetch")
+                    .arg("--stdout")
+                    .output()
+                    .expect("Failed to get system information")
+                    .stdout,
+            )
         )
-        .to_string()
     } else {
         "Nope, wrong passcode lol\n".to_string()
     };
