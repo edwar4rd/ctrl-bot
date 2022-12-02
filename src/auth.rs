@@ -2,6 +2,7 @@
 
 use crate::prelude::*;
 use rsa::{pkcs8::DecodePublicKey, PaddingScheme, PublicKey};
+use sha3::{Digest, Sha3_512};
 use std::iter;
 use std::time;
 
@@ -11,7 +12,7 @@ pub async fn authenticate<'a>(
     action_data: &str,
 ) -> Result<bool, Error> {
     let challenge_random = iter::repeat_with(|| thread_rng().gen::<u8>())
-        .take(192 * 2)
+        .take(192)
         .collect::<Vec<u8>>();
     let challenge_encoded = format!(
         "{}_{}_{}_{}\n",
@@ -21,20 +22,17 @@ pub async fn authenticate<'a>(
             .duration_since(time::UNIX_EPOCH)
             .unwrap()
             .as_millis(),
-        action_data /*
-                    base64::encode({
-                        let mut hasher = Sha3_512::new();
-                        hasher.update(action_data);
-                        hasher.update(challenge_random);
-                        hasher.finalize()
-                    })*/
+        action_data
     );
 
     interaction.create_interaction_response(&ctx, |response| response
         .kind(serenity::InteractionResponseType::ChannelMessageWithSource)
         .interaction_response_data(|msg| msg
             .ephemeral(true)
-            .content(format!("Please authenticate by signing this random message(including the newline) with your secret key:\n```{challenge_encoded}```\n\n```openssl rsautl -sign -inkey privkey.pem | openssl enc -base64```"))
+            .content(format!("Please authenticate by signing this random message(including the newline) with your secret key:
+```{challenge_encoded}```
+
+```openssl dgst -sha3-512 -sign privkey.pem | openssl enc -base64```"))
             .components(|components| components
                 .create_action_row(|row| row
                     .create_button(|btn| btn
@@ -112,6 +110,9 @@ pub async fn authenticate<'a>(
                 .map(|x| *x)
                 .collect::<Vec<u8>>(),
         ) {
+            let mut my_hasher = Sha3_512::new();
+            my_hasher.update(challenge_encoded);
+            let hashed = my_hasher.finalize();
             if rsa::RsaPublicKey::from_public_key_pem(
                 "-----BEGIN PUBLIC KEY-----
 MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAo7/fmoTQhWboiCHpuGF3
@@ -131,8 +132,8 @@ Dy7uxt3qNoJykUCNUqlNBNUCAwEAAQ==
             )
             .unwrap()
             .verify(
-                PaddingScheme::new_pkcs1v15_sign_raw(),
-                &challenge_encoded.as_bytes(),
+                PaddingScheme::new_pkcs1v15_sign::<Sha3_512>(),
+                &hashed,
                 &signed,
             )
             .is_ok()

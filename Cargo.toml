@@ -11,5 +11,5 @@ poise = "0.5.0"
 tokio = { version = "1.4.0", features = ["rt-multi-thread", "process"] }
 base64 = "0.13.0"
 rsa = "0.7.2"
-sha3 = "0.10.6"
+sha3 = { version = "0.10.6", features = ["oid"] }
 build_timestamp = "0.1.0"
