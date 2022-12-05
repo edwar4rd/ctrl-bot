@@ -6,7 +6,7 @@ use build_timestamp::build_time;
 #[poise::command(slash_command, prefix_command)]
 pub async fn botinfo(ctx: Context<'_>) -> Result<(), Error> {
     build_time!("%Y%m%d %H:%M:%S UTC%z");
-    ctx.say(format!("```version = 0.0.7\nlast-update ~= 20221201 23:30:00 UTC+0800\nbuild-time = {BUILD_TIME}```"))
+    ctx.say(format!("```version = 0.0.8\nlast-update ~= 20221205 15:20:00 UTC+0800\nbuild-time = {BUILD_TIME}```"))
         .await?;
     Ok(())
 }
