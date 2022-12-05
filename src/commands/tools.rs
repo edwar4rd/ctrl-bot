@@ -2,7 +2,7 @@
 use crate::prelude::*;
 
 /// Prints system information output by neofetch
-#[poise::command(slash_command)]
+#[poise::command(slash_command, prefix_command)]
 pub async fn neofetch(
     ctx: Context<'_>,
     #[description = "If you want a button for the command"] button: Option<bool>,
@@ -26,6 +26,7 @@ pub async fn neofetch(
         }
         _ => {}
     }
+
     let interaction = match &ctx {
         Application(application_context) => match application_context.interaction {
             ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(interaction) => {
@@ -35,8 +36,20 @@ pub async fn neofetch(
                 unreachable!()
             }
         },
-        _ => {
-            unreachable!();
+        Prefix(prefix_context) => {
+            ctx.send(|msg| {
+                msg.content("Click to perform neofetch").components(|comp| {
+                    comp.create_action_row(|row| {
+                        row.create_button(|btn| {
+                            btn.custom_id("neofetch.btn")
+                                .style(serenity::ButtonStyle::Primary)
+                                .label("Neofetch!")
+                        })
+                    })
+                })
+            })
+            .await?;
+            return Ok(());
         }
     };
 
@@ -199,7 +212,7 @@ pub async fn ping(
     Ok(())
 }
 
-#[poise::command(slash_command)]
+#[poise::command(slash_command, prefix_command)]
 pub async fn stop(ctx: Context<'_>) -> Result<(), Error> {
     ctx.send(|msg| {
         msg.content("Click to STOP the bot").components(|comp| {
