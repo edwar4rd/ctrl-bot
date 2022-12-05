@@ -2,6 +2,7 @@
 use crate::prelude::*;
 use build_timestamp::build_time;
 
+/// Displays information about the bot
 #[poise::command(slash_command, prefix_command)]
 pub async fn botinfo(ctx: Context<'_>) -> Result<(), Error> {
     build_time!("%Y%m%d %H:%M:%S UTC%z");

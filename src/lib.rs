@@ -23,4 +23,9 @@ pub mod prelude {
     pub type Error = Box<dyn std::error::Error + Send + Sync>;
     pub type Context<'a> = poise::Context<'a, Data, Error>;
     pub struct Data {}
+    pub struct ShardManagerContainer;
+
+    impl serenity::TypeMapKey for ShardManagerContainer {
+        type Value = std::sync::Arc<tokio::sync::Mutex<serenity::ShardManager>>;
+    }
 }

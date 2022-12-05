@@ -5,8 +5,27 @@ use crate::prelude::*;
 #[poise::command(slash_command)]
 pub async fn neofetch(
     ctx: Context<'_>,
+    #[description = "If you want a button for the command"] button: Option<bool>,
     // #[description = "Selected user"] user: Option<serenity::User>,
 ) -> Result<(), Error> {
+    match button {
+        Some(true) => {
+            ctx.send(|msg| {
+                msg.content("Click to perform neofetch").components(|comp| {
+                    comp.create_action_row(|row| {
+                        row.create_button(|btn| {
+                            btn.custom_id("neofetch.btn")
+                                .style(serenity::ButtonStyle::Primary)
+                                .label("Neofetch!")
+                        })
+                    })
+                })
+            })
+            .await?;
+            return Ok(());
+        }
+        _ => {}
+    }
     let interaction = match &ctx {
         Application(application_context) => match application_context.interaction {
             ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(interaction) => {
@@ -28,6 +47,30 @@ pub async fn neofetch(
     )
     .await?
     {
+        format!(
+            "```{}```",
+            String::from_utf8_lossy(
+                &Command::new("neofetch")
+                    .arg("--stdout")
+                    .output()
+                    .expect("Failed to get system information")
+                    .stdout,
+            )
+        )
+    } else {
+        "Nope, wrong passcode lol\n".to_string()
+    };
+    interaction
+        .create_followup_message(&ctx, |msg| msg.ephemeral(true).content(response))
+        .await?;
+    Ok(())
+}
+
+pub async fn neofetch_btn_handler<'a>(
+    ctx: &serenity::Context,
+    interaction: &ResponsibleInteraction<'a>,
+) -> Result<(), Error> {
+    let response = if auth::authenticate(&ctx, &interaction, "neofetch").await? {
         format!(
             "```{}```",
             String::from_utf8_lossy(
@@ -154,4 +197,67 @@ pub async fn ping(
         .create_followup_message(&ctx, |msg| msg.ephemeral(true).content(response))
         .await?;
     Ok(())
+}
+
+#[poise::command(slash_command)]
+pub async fn stop(ctx: Context<'_>) -> Result<(), Error> {
+    ctx.send(|msg| {
+        msg.content("Click to STOP the bot").components(|comp| {
+            comp.create_action_row(|row| {
+                row.create_button(|btn| {
+                    btn.custom_id("stop.btn")
+                        .style(serenity::ButtonStyle::Danger)
+                        .label("STOP")
+                })
+            })
+        })
+    })
+    .await?;
+    return Ok(());
+}
+
+pub async fn stop_btn_handler<'a>(
+    ctx: &serenity::Context,
+    interaction: &ResponsibleInteraction<'a>,
+) -> Result<(), Error> {
+    if !auth::authenticate(&ctx, &interaction, "stop").await? {
+        interaction
+            .create_followup_message(&ctx, |msg| {
+                msg.ephemeral(true)
+                    .content("Don't even try to stop me lol\n")
+            })
+            .await?;
+        Ok(())
+    } else {
+        interaction
+            .create_followup_message(&ctx, |msg| {
+                msg.ephemeral(true)
+                    .content("Stopping the bot in 10 seconds...")
+            })
+            .await?;
+        println!("Stopping the bot in 10 seconds...");
+        println!("Triggered by {}", interaction.user());
+        ctx.set_presence(None, serenity::OnlineStatus::DoNotDisturb)
+            .await;
+        tokio::time::sleep(Duration::from_secs(10)).await;
+        println!("Stopping the bot...");
+        match ctx.data.read().await.get::<ShardManagerContainer>() {
+            Some(v) => v,
+            None => {
+                interaction
+                    .create_followup_message(&ctx, |msg| {
+                        msg.ephemeral(true).content("Failed stopping the bot...")
+                    })
+                    .await?;
+                println!("Failed stopping the bot...");
+
+                return Ok(());
+            }
+        }
+        .lock()
+        .await
+        .shutdown_all()
+        .await;
+        Ok(())
+    }
 }

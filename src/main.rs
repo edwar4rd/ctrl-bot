@@ -12,7 +12,19 @@ async fn handler(
                 match interaction.data.component_type {
                     serenity::ComponentType::Button => {
                         if interaction.data.custom_id == "test_auth.auth_btn" {
-                            commands::test_auth_btn_handler(
+                            commands::tests::test_auth_btn_handler(
+                                ctx,
+                                &ResponsibleInteraction::MessageComponent(&interaction),
+                            )
+                            .await?
+                        } else if interaction.data.custom_id == "neofetch.btn" {
+                            commands::tools::neofetch_btn_handler(
+                                ctx,
+                                &ResponsibleInteraction::MessageComponent(&interaction),
+                            )
+                            .await?
+                        } else if interaction.data.custom_id == "stop.btn" {
+                            commands::tools::stop_btn_handler(
                                 ctx,
                                 &ResponsibleInteraction::MessageComponent(&interaction),
                             )
@@ -49,14 +61,15 @@ async fn main() {
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: vec![
-                commands::say(),
-                commands::早安(),
-                commands::ping(),
-                commands::neofetch(),
-                commands::fumo(),
-                commands::botinfo(),
-                commands::test_input(),
-                commands::test_auth(),
+                commands::random::fumo(),
+                commands::random::say(),
+                commands::random::早安(),
+                commands::tests::botinfo(),
+                commands::tests::test_input(),
+                commands::tests::test_auth(),
+                commands::tools::neofetch(),
+                commands::tools::ping(),
+                commands::tools::stop(),
                 help(),
             ],
             event_handler: |ctx, event, _framework, data| Box::pin(handler(ctx, event, data)),
@@ -72,9 +85,11 @@ async fn main() {
                     serenity::OnlineStatus::Idle,
                 )
                 .await;
+                ctx.data.write().await.insert::<ShardManagerContainer>(std::sync::Arc::clone(&framework.shard_manager()));
                 Ok(Data {})
             })
         });
 
     framework.run().await.unwrap();
+    println!("Bot stopped at {}...", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
 }
