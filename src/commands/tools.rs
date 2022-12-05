@@ -36,7 +36,7 @@ pub async fn neofetch(
                 unreachable!()
             }
         },
-        Prefix(prefix_context) => {
+        Prefix(_) => {
             ctx.send(|msg| {
                 msg.content("Click to perform neofetch").components(|comp| {
                     comp.create_action_row(|row| {
@@ -215,15 +215,17 @@ pub async fn ping(
 #[poise::command(slash_command, prefix_command)]
 pub async fn stop(ctx: Context<'_>) -> Result<(), Error> {
     ctx.send(|msg| {
-        msg.content("Click to STOP the bot").components(|comp| {
-            comp.create_action_row(|row| {
-                row.create_button(|btn| {
-                    btn.custom_id("stop.btn")
-                        .style(serenity::ButtonStyle::Danger)
-                        .label("STOP")
+        msg.content("Click to STOP the bot")
+            .ephemeral(true)
+            .components(|comp| {
+                comp.create_action_row(|row| {
+                    row.create_button(|btn| {
+                        btn.custom_id("stop.btn")
+                            .style(serenity::ButtonStyle::Danger)
+                            .label("STOP")
+                    })
                 })
             })
-        })
     })
     .await?;
     return Ok(());
