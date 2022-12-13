@@ -85,11 +85,22 @@ async fn main() {
                     serenity::OnlineStatus::Idle,
                 )
                 .await;
-                ctx.data.write().await.insert::<ShardManagerContainer>(std::sync::Arc::clone(&framework.shard_manager()));
+                ctx.data
+                    .write()
+                    .await
+                    .insert::<ShardManagerContainer>(std::sync::Arc::clone(
+                        &framework.shard_manager(),
+                    ));
                 Ok(Data {})
             })
         });
 
     framework.run().await.unwrap();
-    println!("Bot stopped at {}...", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
+    println!(
+        "Bot stopped at {}...",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    );
 }

@@ -1,13 +1,19 @@
 /// Commands that serves testing purposes of the library or bot's capability
 use crate::prelude::*;
-use build_timestamp::build_time;
+use build_time::build_time_local;
 
 /// Displays information about the bot
 #[poise::command(slash_command, prefix_command)]
 pub async fn botinfo(ctx: Context<'_>) -> Result<(), Error> {
-    build_time!("%Y%m%d %H:%M:%S UTC%z");
-    ctx.say(format!("```version = 0.0.8\nlast-update ~= 20221205 15:20:00 UTC+0800\nbuild-time = {BUILD_TIME}```"))
-        .await?;
+    const VERSION: Option<&str> = option_env!("CARGO_PKG_VERSION");
+    ctx.send(|msg| {
+        msg.ephemeral(true).content(format!(
+            "```version = {}\nbuild-time = {}```",
+            VERSION.unwrap_or("UNKNOWN"),
+            build_time_local!("%Y-%m-%d %H:%M:%S %:z")
+        ))
+    })
+    .await?;
     Ok(())
 }
 
