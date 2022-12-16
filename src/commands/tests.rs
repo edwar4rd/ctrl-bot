@@ -1,10 +1,185 @@
 /// Commands that serves testing purposes of the library or bot's capability
 use crate::prelude::*;
-use build_time::build_time_local;
+
+/// Ask stdin something and wait for response
+#[poise::command(slash_command)]
+pub async fn ask(
+    ctx: Context<'_>,
+    #[description = "What do you want do ask the mysterious stdin?"]
+    #[rest]
+    something: Option<String>,
+    #[description = "How many lines do you want \
+                        the mysterious stdin to answer?"]
+    count: Option<u32>,
+) -> Result<(), Error> {
+    let interaction = match ctx {
+        Application(application) => match application.interaction {
+            poise::ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(interaction) => {
+                interaction
+            }
+            _ => unreachable!(),
+        },
+        _ => unreachable!(),
+    };
+    let count = count.unwrap_or(1);
+    let auth_result = auth::authenticate(
+        ctx.serenity_context(),
+        &ResponsibleInteraction::ApplicationCommand(interaction),
+        "ask",
+    )
+    .await?;
+    let stdin_response = if auth_result {
+        let mut stdin_response = String::new();
+        let stdio_lock = tokio::time::timeout(
+            tokio::time::Duration::from_secs(300),
+            ctx.data().stdio_lock.lock(),
+        )
+        .await;
+        if stdio_lock.is_err() {
+            "*The mysterious stdin is busy talking to someone else...*".to_string()
+        } else {
+            let mut stdin = tokio::io::stdin();
+            println!(
+                "{}",
+                something
+                    .as_ref()
+                    .map_or_else(|| "Something?", |s| s.as_str())
+            );
+            stdin_response.push_str(&read_line(&mut stdin).await?);
+            stdin_response.push('\n');
+            for _ in 1..count {
+                println!("More?");
+                stdin_response.push_str(&read_line(&mut stdin).await?);
+                stdin_response.push('\n');
+            }
+            drop(stdio_lock);
+            stdin_response
+        }
+    } else {
+        "*The mysterious stdin didn't answer...*".to_string()
+    };
+    interaction
+        .create_followup_message(ctx, |message| {
+            message.ephemeral(true).content(format!(
+                "*Message form the mysterious stdin:*\n\n{}",
+                stdin_response
+            ))
+        })
+        .await?;
+    Ok(())
+}
+
+/// Tell stdin something
+#[poise::command(slash_command)]
+pub async fn msg(
+    ctx: Context<'_>,
+    #[description = "What do you want to say to the mysterious stdin?"]
+    #[rest]
+    something: String,
+) -> Result<(), Error> {
+    let interaction = match ctx {
+        Application(application) => match application.interaction {
+            poise::ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(interaction) => {
+                interaction
+            }
+            _ => unreachable!(),
+        },
+        _ => unreachable!(),
+    };
+    let auth_result = auth::authenticate(
+        ctx.serenity_context(),
+        &ResponsibleInteraction::ApplicationCommand(interaction),
+        format!("msg_{}", &something).as_str(),
+    )
+    .await?;
+    let response = if auth_result {
+        let stdio_lock = tokio::time::timeout(
+            tokio::time::Duration::from_secs(300),
+            ctx.data().stdio_lock.lock(),
+        )
+        .await;
+        if stdio_lock.is_err() {
+            "*The mysterious stdin is busy talking to someone else...*"
+        } else {
+            println!("{}", something);
+            "*The mysterious stdin: ...*"
+        }
+    } else {
+        "*The mysterous stdin refused to listen to you...*"
+    };
+    interaction
+        .create_followup_message(ctx, |message| message.ephemeral(true).content(response))
+        .await?;
+    Ok(())
+}
+
+/// Get some words from stdin
+#[poise::command(slash_command)]
+pub async fn getline(
+    ctx: Context<'_>,
+    #[description = "How many lines do you want \
+                        from the mysterious stdin?"]
+    count: Option<u32>,
+) -> Result<(), Error> {
+    let interaction = match ctx {
+        Application(application) => match application.interaction {
+            poise::ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(interaction) => {
+                interaction
+            }
+            _ => unreachable!(),
+        },
+        _ => unreachable!(),
+    };
+    let count = count.unwrap_or(1);
+    let auth_result = auth::authenticate(
+        ctx.serenity_context(),
+        &ResponsibleInteraction::ApplicationCommand(interaction),
+        format!("getline_{}", count).as_str(),
+    )
+    .await?;
+    if auth_result {
+        let stdio_lock = tokio::time::timeout(
+            tokio::time::Duration::from_secs(300),
+            ctx.data().stdio_lock.lock(),
+        )
+        .await;
+        let response = if stdio_lock.is_err() {
+            "*The mysterious stdin is busy talking to someone else...*".to_string()
+        } else {
+            let mut stdin_response = String::new();
+            let mut stdin = tokio::io::stdin();
+            for _ in 0..count {
+                stdin_response.push_str(&read_line(&mut stdin).await?);
+                stdin_response.push('\n');
+            }
+            drop(stdio_lock);
+            stdin_response
+        };
+        interaction
+            .create_followup_message(ctx, |message| message.ephemeral(true).content(&response))
+            .await?;
+    }
+    Ok(())
+}
+
+async fn read_line(stdin: &mut tokio::io::Stdin) -> Result<String, Error> {
+    use poise::futures_util::StreamExt;
+    use tokio_util::codec;
+
+    let mut reader = codec::FramedRead::new(stdin, codec::LinesCodec::new());
+    loop {
+        let line = reader.next().await.transpose()?;
+        if !line.is_none() /*&& !line.as_ref().unwrap().is_empty()*/ {
+            break Ok(line.unwrap());
+        }
+    }
+}
 
 /// Displays information about the bot
 #[poise::command(slash_command, prefix_command)]
 pub async fn botinfo(ctx: Context<'_>) -> Result<(), Error> {
+    use build_time::build_time_local;
+
     const VERSION: Option<&str> = option_env!("CARGO_PKG_VERSION");
     ctx.send(|msg| {
         msg.ephemeral(true).content(format!(

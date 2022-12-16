@@ -64,6 +64,9 @@ async fn main() {
                 commands::random::fumo(),
                 commands::random::say(),
                 commands::random::早安(),
+                commands::tests::ask(),
+                commands::tests::msg(),
+                commands::tests::getline(),
                 commands::tests::botinfo(),
                 commands::tests::test_input(),
                 commands::tests::test_auth(),
@@ -91,7 +94,9 @@ async fn main() {
                     .insert::<ShardManagerContainer>(std::sync::Arc::clone(
                         &framework.shard_manager(),
                     ));
-                Ok(Data {})
+                Ok(Data {
+                    stdio_lock: tokio::sync::Mutex::new(())
+                })
             })
         });
 
