@@ -1,5 +1,6 @@
 use dc_bot::prelude::*;
 
+#[cfg(feature = "handler")]
 async fn handler(
     ctx: &serenity::Context,
     event: &poise::Event<'_>,
@@ -11,19 +12,24 @@ async fn handler(
                 let interaction = interaction.clone().message_component().unwrap();
                 match interaction.data.component_type {
                     serenity::ComponentType::Button => {
+                        #[cfg(feature = "modal_tests")]
                         if interaction.data.custom_id == "test_auth.auth_btn" {
                             commands::tests::test_auth_btn_handler(
                                 ctx,
                                 &ResponsibleInteraction::MessageComponent(&interaction),
                             )
                             .await?
-                        } else if interaction.data.custom_id == "neofetch.btn" {
+                        }
+                        #[cfg(feature = "tools")]
+                        if interaction.data.custom_id == "neofetch.btn" {
                             commands::tools::neofetch_btn_handler(
                                 ctx,
                                 &ResponsibleInteraction::MessageComponent(&interaction),
                             )
                             .await?
-                        } else if interaction.data.custom_id == "stop.btn" {
+                        }
+                        #[cfg(feature = "tools")]
+                        if interaction.data.custom_id == "stop.btn" {
                             commands::tools::stop_btn_handler(
                                 ctx,
                                 &ResponsibleInteraction::MessageComponent(&interaction),
@@ -41,43 +47,58 @@ async fn handler(
     Ok(())
 }
 
-/// Show a help menu
-#[poise::command(slash_command, prefix_command)]
-async fn help(
-    ctx: Context<'_>,
-    #[description = "Specific command to show help about"] command: Option<String>,
-) -> Result<(), Error> {
-    poise::builtins::help(
-        ctx,
-        command.as_deref(),
-        poise::builtins::HelpConfiguration::default(),
-    )
-    .await?;
-    Ok(())
-}
-
 #[tokio::main]
 async fn main() {
+    let mut commands = vec![];
+
+    #[cfg(feature = "random")]
+    {
+        commands.push(commands::random::fumo());
+        commands.push(commands::random::say());
+        commands.push(commands::random::早安());
+    }
+
+    #[cfg(feature = "stdio_tests")]
+    {
+        commands.push(commands::tests::ask());
+        commands.push(commands::tests::msg());
+        commands.push(commands::tests::getline());
+    }
+
+    #[cfg(feature = "modal_tests")]
+    {
+        commands.push(commands::tests::test_input());
+        commands.push(commands::tests::test_auth());
+    }
+
+    #[cfg(feature = "tools")]
+    {
+        commands.push(commands::tools::neofetch());
+        commands.push(commands::tools::ping());
+        commands.push(commands::tools::stop());
+    }
+
+    #[cfg(feature = "dcbothub")]
+    {
+        commands.push(commands::dcbothub::bothub());
+    }
+
+    commands.push(commands::help());
+    commands.push(commands::botinfo());
+
+    #[allow(unused_mut)]
+    let mut options = poise::FrameworkOptions {
+        commands,
+        ..Default::default()
+    };
+
+    #[cfg(feature = "handler")]
+    {
+        options.event_handler = |ctx, event, _framework, data| Box::pin(handler(ctx, event, data));
+    }
+
     let framework = poise::Framework::builder()
-        .options(poise::FrameworkOptions {
-            commands: vec![
-                commands::random::fumo(),
-                commands::random::say(),
-                commands::random::早安(),
-                commands::tests::ask(),
-                commands::tests::msg(),
-                commands::tests::getline(),
-                commands::tests::botinfo(),
-                commands::tests::test_input(),
-                commands::tests::test_auth(),
-                commands::tools::neofetch(),
-                commands::tools::ping(),
-                commands::tools::stop(),
-                help(),
-            ],
-            event_handler: |ctx, event, _framework, data| Box::pin(handler(ctx, event, data)),
-            ..Default::default()
-        })
+        .options(options)
         .token(std::env::var("DISCORD_TOKEN").expect("missing DISCORD_TOKEN"))
         .intents(serenity::GatewayIntents::non_privileged())
         .setup(move |ctx, _ready, framework| {

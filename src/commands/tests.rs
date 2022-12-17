@@ -189,23 +189,6 @@ pub async fn getline(
     Ok(())
 }
 
-/// Displays information about the bot
-#[poise::command(slash_command, prefix_command)]
-pub async fn botinfo(ctx: Context<'_>) -> Result<(), Error> {
-    use build_time::build_time_local;
-
-    const VERSION: Option<&str> = option_env!("CARGO_PKG_VERSION");
-    ctx.send(|msg| {
-        msg.ephemeral(true).content(format!(
-            "```version = {}\nbuild-time = {}```",
-            VERSION.unwrap_or("UNKNOWN"),
-            build_time_local!("%Y-%m-%d %H:%M:%S %:z")
-        ))
-    })
-    .await?;
-    Ok(())
-}
-
 /// Test command that require a string input
 #[poise::command(slash_command)]
 pub async fn test_input(ctx: Context<'_>) -> Result<(), Error> {
