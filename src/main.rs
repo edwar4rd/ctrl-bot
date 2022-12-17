@@ -95,7 +95,11 @@ async fn main() {
                         &framework.shard_manager(),
                     ));
                 Ok(Data {
-                    stdio_lock: tokio::sync::Mutex::new(())
+                    stdio_lock: tokio::sync::Mutex::new(()),
+                    stdin_linereader: tokio::sync::Mutex::new(tokio_util::codec::FramedRead::new(
+                        tokio::io::stdin(),
+                        tokio_util::codec::LinesCodec::new(),
+                    )),
                 })
             })
         });

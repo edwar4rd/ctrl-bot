@@ -1,5 +1,6 @@
 /// Commands that serves testing purposes of the library or bot's capability
 use crate::prelude::*;
+use poise::futures_util::StreamExt;
 
 /// Ask stdin something and wait for response
 #[poise::command(slash_command)]
@@ -38,20 +39,31 @@ pub async fn ask(
         if stdio_lock.is_err() {
             "*The mysterious stdin is busy talking to someone else...*".to_string()
         } else {
-            let mut stdin = tokio::io::stdin();
+            let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
             println!(
                 "{}",
                 something
                     .as_ref()
                     .map_or_else(|| "Something?", |s| s.as_str())
             );
-            stdin_response.push_str(&read_line(&mut stdin).await?);
+            stdin_response.push_str(&loop {
+                let line = stdin_reader.next().await.transpose()?;
+                if !line.is_none() {
+                    break line.unwrap();
+                }
+            });
             stdin_response.push('\n');
             for _ in 1..count {
                 println!("More?");
-                stdin_response.push_str(&read_line(&mut stdin).await?);
+                stdin_response.push_str(&loop {
+                    let line = stdin_reader.next().await.transpose()?;
+                    if !line.is_none() {
+                        break line.unwrap();
+                    }
+                });
                 stdin_response.push('\n');
             }
+            drop(stdin_reader);
             drop(stdio_lock);
             stdin_response
         }
@@ -61,7 +73,7 @@ pub async fn ask(
     interaction
         .create_followup_message(ctx, |message| {
             message.ephemeral(true).content(format!(
-                "*Message form the mysterious stdin:*\n\n{}",
+                "*Message from the mysterious stdin:*\n\n{}",
                 stdin_response
             ))
         })
@@ -102,6 +114,7 @@ pub async fn msg(
             "*The mysterious stdin is busy talking to someone else...*"
         } else {
             println!("{}", something);
+            drop(stdio_lock);
             "*The mysterious stdin: ...*"
         }
     } else {
@@ -146,12 +159,26 @@ pub async fn getline(
         let response = if stdio_lock.is_err() {
             "*The mysterious stdin is busy talking to someone else...*".to_string()
         } else {
+            let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
             let mut stdin_response = String::new();
-            let mut stdin = tokio::io::stdin();
-            for _ in 0..count {
-                stdin_response.push_str(&read_line(&mut stdin).await?);
+            for i in 0..count {
+                interaction
+                    .create_followup_message(ctx, |message| {
+                        message
+                            .ephemeral(true)
+                            .content(format!("Getting message(s) from stdin...{}", i + 1))
+                    })
+                    .await?;
+
+                stdin_response.push_str(&loop {
+                    let line = stdin_reader.next().await.transpose()?;
+                    if !line.is_none() {
+                        break line.unwrap();
+                    }
+                });
                 stdin_response.push('\n');
             }
+            drop(stdin_reader);
             drop(stdio_lock);
             stdin_response
         };
@@ -160,19 +187,6 @@ pub async fn getline(
             .await?;
     }
     Ok(())
-}
-
-async fn read_line(stdin: &mut tokio::io::Stdin) -> Result<String, Error> {
-    use poise::futures_util::StreamExt;
-    use tokio_util::codec;
-
-    let mut reader = codec::FramedRead::new(stdin, codec::LinesCodec::new());
-    loop {
-        let line = reader.next().await.transpose()?;
-        if !line.is_none() /*&& !line.as_ref().unwrap().is_empty()*/ {
-            break Ok(line.unwrap());
-        }
-    }
 }
 
 /// Displays information about the bot

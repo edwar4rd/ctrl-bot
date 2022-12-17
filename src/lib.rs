@@ -24,6 +24,9 @@ pub mod prelude {
     pub type Context<'a> = poise::Context<'a, Data, Error>;
     pub struct Data {
         pub stdio_lock: tokio::sync::Mutex<()>,
+        pub stdin_linereader: tokio::sync::Mutex<
+            tokio_util::codec::FramedRead<tokio::io::Stdin, tokio_util::codec::LinesCodec>,
+        >,
     }
     pub struct ShardManagerContainer;
 
