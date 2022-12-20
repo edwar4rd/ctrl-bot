@@ -11,6 +11,15 @@ use crate::prelude::*;
         "list",
         "list_status",
         "list_tasks",
+        "status",
+        // "task-status",
+        // "clean",
+        // "build",
+        // "pull",
+        // "start",
+        // "msg",
+        // "kill",
+        // "exit",
     )
 )]
 pub async fn bothub(_: Context<'_>) -> Result<(), Error> {
@@ -128,4 +137,84 @@ async fn list_tasks(ctx: Context<'_>) -> Result<(), Error> {
     drop(stdin_reader);
     drop(stdio_lock);
     Ok(())
+}
+
+/// check the status of a bot
+#[poise::command(slash_command)]
+async fn status(
+    ctx: Context<'_>,
+    #[description = "Name of the bot of interest"]
+    #[autocomplete = "autocomplete_botname"]
+    botname: String,
+) -> Result<(), Error> {
+    let candidates = autocomplete_botname(ctx, "").await;
+    if candidates.iter().any(|name| *name == botname) {
+        let stdio_lock = match timeout(
+            tokio::time::Duration::from_secs(30),
+            ctx.data().stdio_lock.lock(),
+        )
+        .await
+        {
+            Ok(lock) => lock,
+            Err(_) => {
+                ctx.say("Failed getting data from bothub.").await?;
+                return Ok(());
+            }
+        };
+
+        let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
+        let bot_status = {
+            println!("status {}", botname);
+            stdin_reader
+                .next()
+                .await
+                .unwrap()
+                .unwrap()
+                .parse::<u32>()
+                .unwrap();
+            stdin_reader.next().await.unwrap().unwrap()
+        };
+        drop(stdin_reader);
+        drop(stdio_lock);
+
+        ctx.say(format!("Bot status:\n```\n{}```", bot_status))
+            .await?;
+    } else {
+        ctx.say(format!("Bot\n```\n{}\n```isn't found in bot list and is filtered for security reasons.", botname))
+            .await?;
+    }
+
+    Ok(())
+}
+
+async fn autocomplete_botname<'a>(ctx: Context<'_>, partial: &'a str) -> Vec<String> {
+    let bot_list = if let Ok(stdio_lock) = timeout(
+        tokio::time::Duration::from_secs(30),
+        ctx.data().stdio_lock.lock(),
+    )
+    .await
+    {
+        let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
+        println!("list");
+        stdin_reader
+            .next()
+            .await
+            .unwrap()
+            .unwrap()
+            .parse::<u32>()
+            .unwrap();
+        let bot_list = stdin_reader.next().await.unwrap().unwrap();
+        drop(stdin_reader);
+        drop(stdio_lock);
+        bot_list
+    } else {
+        "".to_string()
+    };
+
+    // futures::stream::iter().to_owned().map(|name| name.to_string())
+    bot_list
+        .split(' ')
+        .filter(|name| name.starts_with(partial))
+        .map(|name| name.to_string())
+        .collect::<Vec<String>>()
 }
