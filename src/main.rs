@@ -126,7 +126,7 @@ async fn main() {
         });
 
     framework.run().await.unwrap();
-    println!(
+    eprintln!(
         "Bot stopped at {}...",
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

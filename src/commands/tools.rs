@@ -250,12 +250,12 @@ pub async fn stop_btn_handler<'a>(
                     .content("Stopping the bot in 10 seconds...")
             })
             .await?;
-        println!("Stopping the bot in 10 seconds...");
-        println!("Triggered by {}", interaction.user());
+        eprintln!("Stopping the bot in 10 seconds...");
+        eprintln!("Triggered by {}", interaction.user());
         ctx.set_presence(None, serenity::OnlineStatus::DoNotDisturb)
             .await;
         tokio::time::sleep(Duration::from_secs(10)).await;
-        println!("Stopping the bot...");
+        eprintln!("Stopping the bot...");
         match ctx.data.read().await.get::<ShardManagerContainer>() {
             Some(v) => v,
             None => {
@@ -264,7 +264,7 @@ pub async fn stop_btn_handler<'a>(
                         msg.ephemeral(true).content("Failed stopping the bot...")
                     })
                     .await?;
-                println!("Failed stopping the bot...");
+                eprintln!("Failed stopping the bot...");
 
                 return Ok(());
             }
