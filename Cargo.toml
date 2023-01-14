@@ -16,7 +16,7 @@ sha3 = { version = "0.10.6", features = ["oid"] }
 build-time = "0.1.0"
 
 [features]
-default = ["random", "stdio_tests", "modal_tests", "tools", "dcbothub"]
+default = ["dcbothub", "tools"]
 random = []
 stdio_tests = []
 modal_tests = ["handler"]
