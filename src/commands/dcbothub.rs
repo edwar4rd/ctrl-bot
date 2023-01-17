@@ -19,17 +19,17 @@ use crate::prelude::*;
         "build",
         "pull",
         "start",
-        // "msg",
-        // "verify",
+        "msg",
+        "verify",
         "kill",
         "control_restart",
         "terminate",
-        // "conclude",
-        // "wait",
-        // "finish",
-        // "exit",
+        "conclude",
+        "wait",
+        "finish",
     )
 )]
+
 pub async fn bothub(_: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
@@ -369,7 +369,8 @@ async fn clean(
             Err(_) => {
                 interaction
                     .create_followup_message(ctx, |m| {
-                        m.ephemeral(true).content("Failed sending command to bothub.")
+                        m.ephemeral(true)
+                            .content("Failed sending command to bothub.")
                     })
                     .await?;
                 return Ok(());
@@ -393,7 +394,8 @@ async fn clean(
 
         interaction
             .create_followup_message(ctx, |m| {
-                m.ephemeral(true).content(format!("Result:\n```\n{}```", command_result))
+                m.ephemeral(true)
+                    .content(format!("Result:\n```\n{}```", command_result))
             })
             .await?;
     } else {
@@ -441,7 +443,8 @@ async fn build(
             Err(_) => {
                 interaction
                     .create_followup_message(ctx, |m| {
-                        m.ephemeral(true).content("Failed sending command to bothub.")
+                        m.ephemeral(true)
+                            .content("Failed sending command to bothub.")
                     })
                     .await?;
                 return Ok(());
@@ -465,7 +468,8 @@ async fn build(
 
         interaction
             .create_followup_message(ctx, |m| {
-                m.ephemeral(true).content(format!("Result:\n```\n{}```", command_result))
+                m.ephemeral(true)
+                    .content(format!("Result:\n```\n{}```", command_result))
             })
             .await?;
     } else {
@@ -513,7 +517,8 @@ async fn pull(
             Err(_) => {
                 interaction
                     .create_followup_message(ctx, |m| {
-                        m.ephemeral(true).content("Failed sending command to bothub.")
+                        m.ephemeral(true)
+                            .content("Failed sending command to bothub.")
                     })
                     .await?;
                 return Ok(());
@@ -537,7 +542,8 @@ async fn pull(
 
         interaction
             .create_followup_message(ctx, |m| {
-                m.ephemeral(true).content(format!("Result:\n```\n{}```", command_result))
+                m.ephemeral(true)
+                    .content(format!("Result:\n```\n{}```", command_result))
             })
             .await?;
     } else {
@@ -585,7 +591,8 @@ async fn start(
             Err(_) => {
                 interaction
                     .create_followup_message(ctx, |m| {
-                        m.ephemeral(true).content("Failed sending command to bothub.")
+                        m.ephemeral(true)
+                            .content("Failed sending command to bothub.")
                     })
                     .await?;
                 return Ok(());
@@ -609,7 +616,8 @@ async fn start(
 
         interaction
             .create_followup_message(ctx, |m| {
-                m.ephemeral(true).content(format!("Result:\n```\n{}```", command_result))
+                m.ephemeral(true)
+                    .content(format!("Result:\n```\n{}```", command_result))
             })
             .await?;
     } else {
@@ -618,6 +626,208 @@ async fn start(
             botname
         ))
         .await?;
+    }
+
+    Ok(())
+}
+
+/// print a message to the stdin of the a bot
+#[poise::command(slash_command)]
+async fn msg(
+    ctx: Context<'_>,
+    #[description = "Name of the bot of interest"]
+    #[autocomplete = "autocomplete_ebotname"]
+    botname: String,
+    #[description = "Message to send to the bot"] message: String,
+) -> Result<(), Error> {
+    let candidates = autocomplete_ebotname(ctx, "").await;
+    if candidates.iter().any(|name| *name == botname) {
+        let interaction = slash_ctx_as_responsibe_interaction(&ctx);
+        if !auth::authenticate(
+            ctx.serenity_context(),
+            &interaction,
+            &format!("bothub_message_{botname}_{message}"),
+        )
+        .await?
+        {
+            interaction
+                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                .await?;
+            return Ok(());
+        }
+
+        let stdio_lock = match timeout(
+            tokio::time::Duration::from_secs(30),
+            ctx.data().stdio_lock.lock(),
+        )
+        .await
+        {
+            Ok(lock) => lock,
+            Err(_) => {
+                interaction
+                    .create_followup_message(ctx, |m| {
+                        m.ephemeral(true)
+                            .content("Failed sending command to bothub.")
+                    })
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
+        let command_result = {
+            println!("msg {} {}", botname, message);
+            stdin_reader
+                .next()
+                .await
+                .unwrap()
+                .unwrap()
+                .parse::<u32>()
+                .unwrap();
+            stdin_reader.next().await.unwrap().unwrap()
+        };
+        drop(stdin_reader);
+        drop(stdio_lock);
+
+        interaction
+            .create_followup_message(ctx, |m| {
+                m.ephemeral(true)
+                    .content(format!("Result:\n```\n{}```", command_result))
+            })
+            .await?;
+    } else {
+        ctx.say(format!(
+            "Bot\n```\n{}\n```isn't found in bot list and is filtered for security reasons.",
+            botname
+        ))
+        .await?;
+    }
+
+    Ok(())
+}
+
+/// verify paths loaded from `bots.toml`,
+#[poise::command(slash_command)]
+async fn verify(
+    ctx: Context<'_>,
+    #[description = "Name of the bot of interest"]
+    #[autocomplete = "autocomplete_botname"]
+    botname: Option<String>,
+) -> Result<(), Error> {
+    match botname {
+        Some(botname) => {
+            let candidates = autocomplete_botname(ctx, "").await;
+            if candidates.iter().any(|name| *name == botname) {
+                let interaction = slash_ctx_as_responsibe_interaction(&ctx);
+                if !auth::authenticate(
+                    ctx.serenity_context(),
+                    &interaction,
+                    &format!("bothub_verify_{botname}"),
+                )
+                .await?
+                {
+                    interaction
+                        .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                        .await?;
+                    return Ok(());
+                }
+
+                let stdio_lock = match timeout(
+                    tokio::time::Duration::from_secs(30),
+                    ctx.data().stdio_lock.lock(),
+                )
+                .await
+                {
+                    Ok(lock) => lock,
+                    Err(_) => {
+                        interaction
+                            .create_followup_message(ctx, |m| {
+                                m.ephemeral(true)
+                                    .content("Failed sending command to bothub.")
+                            })
+                            .await?;
+                        return Ok(());
+                    }
+                };
+
+                let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
+                println!("verify {}", botname);
+                let line_count = stdin_reader
+                    .next()
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .parse::<u32>()
+                    .unwrap();
+                let mut command_result = String::new();
+                for _ in 0..line_count {
+                    command_result.push_str(&stdin_reader.next().await.unwrap().unwrap());
+                    command_result.push('\n');
+                }
+                drop(stdin_reader);
+                drop(stdio_lock);
+
+                autosplit_output(&ctx, &interaction, &command_result).await?;
+            } else {
+                ctx.say(format!(
+                "Bot\n```\n{}\n```isn't found in bot list and is filtered for security reasons.",
+                botname
+            ))
+                .await?;
+            }
+        }
+        None => {
+            let interaction = slash_ctx_as_responsibe_interaction(&ctx);
+            if !auth::authenticate(
+                ctx.serenity_context(),
+                &interaction,
+                &format!("bothub_verify"),
+            )
+            .await?
+            {
+                interaction
+                    .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                    .await?;
+                return Ok(());
+            }
+
+            let stdio_lock = match timeout(
+                tokio::time::Duration::from_secs(30),
+                ctx.data().stdio_lock.lock(),
+            )
+            .await
+            {
+                Ok(lock) => lock,
+                Err(_) => {
+                    interaction
+                        .create_followup_message(ctx, |m| {
+                            m.ephemeral(true)
+                                .content("Failed sending command to bothub.")
+                        })
+                        .await?;
+                    return Ok(());
+                }
+            };
+
+            let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
+            println!("verify");
+            let line_count = stdin_reader
+                .next()
+                .await
+                .unwrap()
+                .unwrap()
+                .parse::<u32>()
+                .unwrap();
+            let mut command_result = String::new();
+            for _ in 0..line_count {
+                command_result.push_str(&stdin_reader.next().await.unwrap().unwrap());
+                command_result.push('\n');
+            }
+            drop(stdin_reader);
+            drop(stdio_lock);
+
+            autosplit_output(&ctx, &interaction, &command_result).await?;
+        }
     }
 
     Ok(())
@@ -657,7 +867,8 @@ async fn kill(
             Err(_) => {
                 interaction
                     .create_followup_message(ctx, |m| {
-                        m.ephemeral(true).content("Failed sending command to bothub.")
+                        m.ephemeral(true)
+                            .content("Failed sending command to bothub.")
                     })
                     .await?;
                 return Ok(());
@@ -681,7 +892,8 @@ async fn kill(
 
         interaction
             .create_followup_message(ctx, |m| {
-                m.ephemeral(true).content(format!("Result:\n```\n{}```", command_result))
+                m.ephemeral(true)
+                    .content(format!("Result:\n```\n{}```", command_result))
             })
             .await?;
     } else {
@@ -729,7 +941,8 @@ async fn terminate(
             Err(_) => {
                 interaction
                     .create_followup_message(ctx, |m| {
-                        m.ephemeral(true).content("Failed sending command to bothub.")
+                        m.ephemeral(true)
+                            .content("Failed sending command to bothub.")
                     })
                     .await?;
                 return Ok(());
@@ -753,9 +966,218 @@ async fn terminate(
 
         interaction
             .create_followup_message(ctx, |m| {
-                m.ephemeral(true).content(format!("Result:\n```\n{}```", command_result))
+                m.ephemeral(true)
+                    .content(format!("Result:\n```\n{}```", command_result))
             })
             .await?;
+    } else {
+        ctx.say(format!(
+            "Task\n```\n{}\n```isn't found in task list and is filtered for security reasons.",
+            taskid
+        ))
+        .await?;
+    }
+
+    Ok(())
+}
+
+/// print out the exit status and output of a stopped bot and remove it from `bot_instances`
+#[poise::command(slash_command)]
+async fn conclude(
+    ctx: Context<'_>,
+    #[description = "Name of the bot of interest"]
+    #[autocomplete = "autocomplete_ebotname"]
+    botname: String,
+) -> Result<(), Error> {
+    let candidates = autocomplete_ebotname(ctx, "").await;
+    if candidates.iter().any(|name| *name == botname) {
+        let interaction = slash_ctx_as_responsibe_interaction(&ctx);
+        if !auth::authenticate(
+            ctx.serenity_context(),
+            &interaction,
+            &format!("bothub_conclude_{botname}"),
+        )
+        .await?
+        {
+            interaction
+                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                .await?;
+            return Ok(());
+        }
+
+        let stdio_lock = match timeout(
+            tokio::time::Duration::from_secs(30),
+            ctx.data().stdio_lock.lock(),
+        )
+        .await
+        {
+            Ok(lock) => lock,
+            Err(_) => {
+                interaction
+                    .create_followup_message(ctx, |m| {
+                        m.ephemeral(true)
+                            .content("Failed sending command to bothub.")
+                    })
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
+        println!("conclude {botname}");
+        let line_count = stdin_reader
+            .next()
+            .await
+            .unwrap()
+            .unwrap()
+            .parse::<u32>()
+            .unwrap();
+        let mut command_result = String::new();
+        for _ in 0..line_count {
+            command_result.push_str(&stdin_reader.next().await.unwrap().unwrap());
+            command_result.push('\n');
+        }
+        drop(stdin_reader);
+        drop(stdio_lock);
+
+        autosplit_output(&ctx, &interaction, &command_result).await?;
+    } else {
+        ctx.say(format!(
+            "Bot\n```\n{}\n```isn't found in bot list and is filtered for security reasons.",
+            botname
+        ))
+        .await?;
+    }
+
+    Ok(())
+}
+
+/// wait a task to finish, or to fail, and return the exit status of the task
+#[poise::command(slash_command)]
+async fn wait(
+    ctx: Context<'_>,
+    #[description = "Id of the task of interest"]
+    #[autocomplete = "autocomplete_taskid"]
+    taskid: String,
+) -> Result<(), Error> {
+    let candidates = autocomplete_taskid(ctx, "").await;
+    if candidates.iter().any(|name| *name == taskid) {
+        let interaction = slash_ctx_as_responsibe_interaction(&ctx);
+        if !auth::authenticate(
+            ctx.serenity_context(),
+            &interaction,
+            &format!("bothub_wait_{taskid}"),
+        )
+        .await?
+        {
+            interaction
+                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                .await?;
+            return Ok(());
+        }
+
+        let stdio_lock = match timeout(
+            tokio::time::Duration::from_secs(30),
+            ctx.data().stdio_lock.lock(),
+        )
+        .await
+        {
+            Ok(lock) => lock,
+            Err(_) => {
+                interaction
+                    .create_followup_message(ctx, |m| {
+                        m.ephemeral(true)
+                            .content("Failed sending command to bothub.")
+                    })
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
+        println!("wait {taskid}");
+        stdin_reader
+            .next()
+            .await
+            .unwrap()
+            .unwrap()
+            .parse::<u32>()
+            .unwrap();
+        let command_result = stdin_reader.next().await.unwrap().unwrap();
+        drop(stdin_reader);
+        drop(stdio_lock);
+        autosplit_output(&ctx, &interaction, &command_result).await?;
+    } else {
+        ctx.say(format!(
+            "Task\n```\n{}\n```isn't found in task list and is filtered for security reasons.",
+            taskid
+        ))
+        .await?;
+    }
+
+    Ok(())
+}
+
+/// print out the exit status and output of a stopped bot and remove it from `bot_instances`
+#[poise::command(slash_command)]
+async fn finish(
+    ctx: Context<'_>,
+    #[description = "Id of the task of interest"]
+    #[autocomplete = "autocomplete_taskid"]
+    taskid: String,
+) -> Result<(), Error> {
+    let candidates = autocomplete_taskid(ctx, "").await;
+    if candidates.iter().any(|name| *name == taskid) {
+        let interaction = slash_ctx_as_responsibe_interaction(&ctx);
+        if !auth::authenticate(
+            ctx.serenity_context(),
+            &interaction,
+            &format!("bothub_finish_{taskid}"),
+        )
+        .await?
+        {
+            interaction
+                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                .await?;
+            return Ok(());
+        }
+
+        let stdio_lock = match timeout(
+            tokio::time::Duration::from_secs(30),
+            ctx.data().stdio_lock.lock(),
+        )
+        .await
+        {
+            Ok(lock) => lock,
+            Err(_) => {
+                interaction
+                    .create_followup_message(ctx, |m| {
+                        m.ephemeral(true)
+                            .content("Failed sending command to bothub.")
+                    })
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
+        println!("finish {taskid}");
+        let line_count = stdin_reader
+            .next()
+            .await
+            .unwrap()
+            .unwrap()
+            .parse::<u32>()
+            .unwrap();
+        let mut command_result = String::new();
+        for _ in 0..line_count {
+            command_result.push_str(&stdin_reader.next().await.unwrap().unwrap());
+            command_result.push('\n');
+        }
+        drop(stdin_reader);
+        drop(stdio_lock);
+
+        autosplit_output(&ctx, &interaction, &command_result).await?;
     } else {
         ctx.say(format!(
             "Task\n```\n{}\n```isn't found in task list and is filtered for security reasons.",

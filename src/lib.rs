@@ -49,4 +49,37 @@ pub mod prelude {
             }
         }
     }
+
+    pub async fn autosplit_output<'a>(ctx: &'a Context<'_>, interaction: &'a ResponsibleInteraction<'a>, content: &'a String) -> Result<(), Error> {
+        let response = if content.len() > 1990 {
+            let mut lines = content.lines();
+            let mut current = String::new();
+            loop {
+                match lines.next() {
+                    Some(line) => {
+                        if current.len() + line.len() > 1990 {
+                            interaction
+                                .create_followup_message(&ctx, |msg| {
+                                    msg.ephemeral(true)
+                                        .content(format!("```{}```", current))
+                                })
+                                .await?;
+                            current.clear();
+                        }
+                        current.push('\n');
+                        current.push_str(line);
+                    }
+                    None => {
+                        break format!("```{}```", current);
+                    }
+                }
+            }
+        } else {
+            format!("```{content}```")
+        };
+        interaction
+        .create_followup_message(&ctx, |msg| msg.ephemeral(true).content(response))
+        .await?;
+        Ok(())
+    }
 }
