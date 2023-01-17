@@ -14,16 +14,16 @@ use crate::prelude::*;
         "list_status",
         "list_tasks",
         "status",
-        // "task-status",
-        // "clean",
-        // "build",
-        // "pull",
-        // "start",
+        "task_status",
+        "clean",
+        "build",
+        "pull",
+        "start",
         // "msg",
         // "verify",
-        // "kill",
+        "kill",
         "control_restart",
-        // "terminate",
+        "terminate",
         // "conclude",
         // "wait",
         // "finish",
@@ -238,10 +238,10 @@ async fn list_tasks(ctx: Context<'_>) -> Result<(), Error> {
 async fn status(
     ctx: Context<'_>,
     #[description = "Name of the bot of interest"]
-    #[autocomplete = "autocomplete_botname"]
+    #[autocomplete = "autocomplete_ebotname"]
     botname: String,
 ) -> Result<(), Error> {
-    let candidates = autocomplete_botname(ctx, "").await;
+    let candidates = autocomplete_ebotname(ctx, "").await;
     if candidates.iter().any(|name| *name == botname) {
         let stdio_lock = match timeout(
             tokio::time::Duration::from_secs(30),
@@ -277,6 +277,489 @@ async fn status(
         ctx.say(format!(
             "Bot\n```\n{}\n```isn't found in bot list and is filtered for security reasons.",
             botname
+        ))
+        .await?;
+    }
+
+    Ok(())
+}
+
+/// check the status of a task
+#[poise::command(slash_command, rename = "task-status")]
+async fn task_status(
+    ctx: Context<'_>,
+    #[description = "Id of the task of interest"]
+    #[autocomplete = "autocomplete_taskid"]
+    taskid: String,
+) -> Result<(), Error> {
+    let candidates = autocomplete_taskid(ctx, "").await;
+    if candidates.iter().any(|name| *name == taskid) {
+        let stdio_lock = match timeout(
+            tokio::time::Duration::from_secs(30),
+            ctx.data().stdio_lock.lock(),
+        )
+        .await
+        {
+            Ok(lock) => lock,
+            Err(_) => {
+                ctx.say("Failed getting data from bothub.").await?;
+                return Ok(());
+            }
+        };
+
+        let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
+        let bot_status = {
+            println!("task-status {}", taskid);
+            stdin_reader
+                .next()
+                .await
+                .unwrap()
+                .unwrap()
+                .parse::<u32>()
+                .unwrap();
+            stdin_reader.next().await.unwrap().unwrap()
+        };
+        drop(stdin_reader);
+        drop(stdio_lock);
+
+        ctx.say(format!("Task status:\n```\n{}```", bot_status))
+            .await?;
+    } else {
+        ctx.say(format!(
+            "Task\n```\n{}\n```isn't found in task list and is filtered for security reasons.",
+            taskid
+        ))
+        .await?;
+    }
+
+    Ok(())
+}
+
+/// perform a `cargo clean` at the repo of a bot
+#[poise::command(slash_command)]
+async fn clean(
+    ctx: Context<'_>,
+    #[description = "Name of the bot of interest"]
+    #[autocomplete = "autocomplete_botname"]
+    botname: String,
+) -> Result<(), Error> {
+    let candidates = autocomplete_botname(ctx, "").await;
+    if candidates.iter().any(|name| *name == botname) {
+        let interaction = slash_ctx_as_responsibe_interaction(&ctx);
+        if !auth::authenticate(
+            ctx.serenity_context(),
+            &interaction,
+            &format!("bothub_clean_{botname}"),
+        )
+        .await?
+        {
+            interaction
+                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                .await?;
+            return Ok(());
+        }
+
+        let stdio_lock = match timeout(
+            tokio::time::Duration::from_secs(30),
+            ctx.data().stdio_lock.lock(),
+        )
+        .await
+        {
+            Ok(lock) => lock,
+            Err(_) => {
+                interaction
+                    .create_followup_message(ctx, |m| {
+                        m.ephemeral(true).content("Failed sending command to bothub.")
+                    })
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
+        let command_result = {
+            println!("clean {}", botname);
+            stdin_reader
+                .next()
+                .await
+                .unwrap()
+                .unwrap()
+                .parse::<u32>()
+                .unwrap();
+            stdin_reader.next().await.unwrap().unwrap()
+        };
+        drop(stdin_reader);
+        drop(stdio_lock);
+
+        interaction
+            .create_followup_message(ctx, |m| {
+                m.ephemeral(true).content(format!("Result:\n```\n{}```", command_result))
+            })
+            .await?;
+    } else {
+        ctx.say(format!(
+            "Bot\n```\n{}\n```isn't found in bot list and is filtered for security reasons.",
+            botname
+        ))
+        .await?;
+    }
+
+    Ok(())
+}
+
+/// perform a `cargo build` at the repo of a bot
+#[poise::command(slash_command)]
+async fn build(
+    ctx: Context<'_>,
+    #[description = "Name of the bot of interest"]
+    #[autocomplete = "autocomplete_botname"]
+    botname: String,
+) -> Result<(), Error> {
+    let candidates = autocomplete_botname(ctx, "").await;
+    if candidates.iter().any(|name| *name == botname) {
+        let interaction = slash_ctx_as_responsibe_interaction(&ctx);
+        if !auth::authenticate(
+            ctx.serenity_context(),
+            &interaction,
+            &format!("bothub_build_{botname}"),
+        )
+        .await?
+        {
+            interaction
+                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                .await?;
+            return Ok(());
+        }
+
+        let stdio_lock = match timeout(
+            tokio::time::Duration::from_secs(30),
+            ctx.data().stdio_lock.lock(),
+        )
+        .await
+        {
+            Ok(lock) => lock,
+            Err(_) => {
+                interaction
+                    .create_followup_message(ctx, |m| {
+                        m.ephemeral(true).content("Failed sending command to bothub.")
+                    })
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
+        let command_result = {
+            println!("build {}", botname);
+            stdin_reader
+                .next()
+                .await
+                .unwrap()
+                .unwrap()
+                .parse::<u32>()
+                .unwrap();
+            stdin_reader.next().await.unwrap().unwrap()
+        };
+        drop(stdin_reader);
+        drop(stdio_lock);
+
+        interaction
+            .create_followup_message(ctx, |m| {
+                m.ephemeral(true).content(format!("Result:\n```\n{}```", command_result))
+            })
+            .await?;
+    } else {
+        ctx.say(format!(
+            "Bot\n```\n{}\n```isn't found in bot list and is filtered for security reasons.",
+            botname
+        ))
+        .await?;
+    }
+
+    Ok(())
+}
+
+/// perform a `git pull` at the repo of a bot
+#[poise::command(slash_command)]
+async fn pull(
+    ctx: Context<'_>,
+    #[description = "Name of the bot of interest"]
+    #[autocomplete = "autocomplete_botname"]
+    botname: String,
+) -> Result<(), Error> {
+    let candidates = autocomplete_botname(ctx, "").await;
+    if candidates.iter().any(|name| *name == botname) {
+        let interaction = slash_ctx_as_responsibe_interaction(&ctx);
+        if !auth::authenticate(
+            ctx.serenity_context(),
+            &interaction,
+            &format!("bothub_pull_{botname}"),
+        )
+        .await?
+        {
+            interaction
+                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                .await?;
+            return Ok(());
+        }
+
+        let stdio_lock = match timeout(
+            tokio::time::Duration::from_secs(30),
+            ctx.data().stdio_lock.lock(),
+        )
+        .await
+        {
+            Ok(lock) => lock,
+            Err(_) => {
+                interaction
+                    .create_followup_message(ctx, |m| {
+                        m.ephemeral(true).content("Failed sending command to bothub.")
+                    })
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
+        let command_result = {
+            println!("pull {}", botname);
+            stdin_reader
+                .next()
+                .await
+                .unwrap()
+                .unwrap()
+                .parse::<u32>()
+                .unwrap();
+            stdin_reader.next().await.unwrap().unwrap()
+        };
+        drop(stdin_reader);
+        drop(stdio_lock);
+
+        interaction
+            .create_followup_message(ctx, |m| {
+                m.ephemeral(true).content(format!("Result:\n```\n{}```", command_result))
+            })
+            .await?;
+    } else {
+        ctx.say(format!(
+            "Bot\n```\n{}\n```isn't found in bot list and is filtered for security reasons.",
+            botname
+        ))
+        .await?;
+    }
+
+    Ok(())
+}
+
+/// start the bot if it isn't already runninng
+#[poise::command(slash_command)]
+async fn start(
+    ctx: Context<'_>,
+    #[description = "Name of the bot of interest"]
+    #[autocomplete = "autocomplete_botname"]
+    botname: String,
+) -> Result<(), Error> {
+    let candidates = autocomplete_botname(ctx, "").await;
+    if candidates.iter().any(|name| *name == botname) {
+        let interaction = slash_ctx_as_responsibe_interaction(&ctx);
+        if !auth::authenticate(
+            ctx.serenity_context(),
+            &interaction,
+            &format!("bothub_start_{botname}"),
+        )
+        .await?
+        {
+            interaction
+                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                .await?;
+            return Ok(());
+        }
+
+        let stdio_lock = match timeout(
+            tokio::time::Duration::from_secs(30),
+            ctx.data().stdio_lock.lock(),
+        )
+        .await
+        {
+            Ok(lock) => lock,
+            Err(_) => {
+                interaction
+                    .create_followup_message(ctx, |m| {
+                        m.ephemeral(true).content("Failed sending command to bothub.")
+                    })
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
+        let command_result = {
+            println!("start {}", botname);
+            stdin_reader
+                .next()
+                .await
+                .unwrap()
+                .unwrap()
+                .parse::<u32>()
+                .unwrap();
+            stdin_reader.next().await.unwrap().unwrap()
+        };
+        drop(stdin_reader);
+        drop(stdio_lock);
+
+        interaction
+            .create_followup_message(ctx, |m| {
+                m.ephemeral(true).content(format!("Result:\n```\n{}```", command_result))
+            })
+            .await?;
+    } else {
+        ctx.say(format!(
+            "Bot\n```\n{}\n```isn't found in bot list and is filtered for security reasons.",
+            botname
+        ))
+        .await?;
+    }
+
+    Ok(())
+}
+
+/// stop a bot with the given name
+#[poise::command(slash_command)]
+async fn kill(
+    ctx: Context<'_>,
+    #[description = "Name of the bot of interest"]
+    #[autocomplete = "autocomplete_ebotname"]
+    botname: String,
+) -> Result<(), Error> {
+    let candidates = autocomplete_ebotname(ctx, "").await;
+    if candidates.iter().any(|name| *name == botname) {
+        let interaction = slash_ctx_as_responsibe_interaction(&ctx);
+        if !auth::authenticate(
+            ctx.serenity_context(),
+            &interaction,
+            &format!("bothub_kill_{botname}"),
+        )
+        .await?
+        {
+            interaction
+                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                .await?;
+            return Ok(());
+        }
+
+        let stdio_lock = match timeout(
+            tokio::time::Duration::from_secs(30),
+            ctx.data().stdio_lock.lock(),
+        )
+        .await
+        {
+            Ok(lock) => lock,
+            Err(_) => {
+                interaction
+                    .create_followup_message(ctx, |m| {
+                        m.ephemeral(true).content("Failed sending command to bothub.")
+                    })
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
+        let command_result = {
+            println!("kill {}", botname);
+            stdin_reader
+                .next()
+                .await
+                .unwrap()
+                .unwrap()
+                .parse::<u32>()
+                .unwrap();
+            stdin_reader.next().await.unwrap().unwrap()
+        };
+        drop(stdin_reader);
+        drop(stdio_lock);
+
+        interaction
+            .create_followup_message(ctx, |m| {
+                m.ephemeral(true).content(format!("Result:\n```\n{}```", command_result))
+            })
+            .await?;
+    } else {
+        ctx.say(format!(
+            "Bot\n```\n{}\n```isn't found in bot list and is filtered for security reasons.",
+            botname
+        ))
+        .await?;
+    }
+
+    Ok(())
+}
+
+/// stop a bot with the given name
+#[poise::command(slash_command)]
+async fn terminate(
+    ctx: Context<'_>,
+    #[description = "Id of the task of interest"]
+    #[autocomplete = "autocomplete_taskid"]
+    taskid: String,
+) -> Result<(), Error> {
+    let candidates = autocomplete_taskid(ctx, "").await;
+    if candidates.iter().any(|name| *name == taskid) {
+        let interaction = slash_ctx_as_responsibe_interaction(&ctx);
+        if !auth::authenticate(
+            ctx.serenity_context(),
+            &interaction,
+            &format!("bothub_terminate_{taskid}"),
+        )
+        .await?
+        {
+            interaction
+                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                .await?;
+            return Ok(());
+        }
+
+        let stdio_lock = match timeout(
+            tokio::time::Duration::from_secs(30),
+            ctx.data().stdio_lock.lock(),
+        )
+        .await
+        {
+            Ok(lock) => lock,
+            Err(_) => {
+                interaction
+                    .create_followup_message(ctx, |m| {
+                        m.ephemeral(true).content("Failed sending command to bothub.")
+                    })
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
+        let command_result = {
+            println!("terminate {}", taskid);
+            stdin_reader
+                .next()
+                .await
+                .unwrap()
+                .unwrap()
+                .parse::<u32>()
+                .unwrap();
+            stdin_reader.next().await.unwrap().unwrap()
+        };
+        drop(stdin_reader);
+        drop(stdio_lock);
+
+        interaction
+            .create_followup_message(ctx, |m| {
+                m.ephemeral(true).content(format!("Result:\n```\n{}```", command_result))
+            })
+            .await?;
+    } else {
+        ctx.say(format!(
+            "Task\n```\n{}\n```isn't found in task list and is filtered for security reasons.",
+            taskid
         ))
         .await?;
     }
@@ -320,14 +803,14 @@ pub async fn ctrl_restart_btn_handler<'a>(
         interaction
             .create_followup_message(&ctx, |msg| {
                 msg.ephemeral(true)
-                    .content("Restarting the bot in 10 seconds...")
+                    .content("Restarting the bot in 5 seconds...")
             })
             .await?;
-        eprintln!("Restarting the bot in 10 seconds...");
+        eprintln!("Restarting the bot in 5 seconds...");
         eprintln!("Triggered by {}", interaction.user());
         ctx.set_presence(None, serenity::OnlineStatus::DoNotDisturb)
             .await;
-        tokio::time::sleep(Duration::from_secs(10)).await;
+        tokio::time::sleep(Duration::from_secs(5)).await;
         eprintln!("Stopping the bot...");
         match ctx.data.read().await.get::<ShardManagerContainer>() {
             Some(v) => v,

@@ -33,4 +33,20 @@ pub mod prelude {
     impl serenity::TypeMapKey for ShardManagerContainer {
         type Value = std::sync::Arc<tokio::sync::Mutex<serenity::ShardManager>>;
     }
+
+    pub fn slash_ctx_as_responsibe_interaction<'a>(ctx: &'a Context<'_>) -> ResponsibleInteraction<'a> {
+        match &ctx {
+            Application(application_context) => match application_context.interaction {
+                ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(interaction) => {
+                    ResponsibleInteraction::ApplicationCommand(interaction)
+                }
+                _ => {
+                    unreachable!()
+                }
+            },
+            _ => {
+                unreachable!();
+            }
+        }
+    }
 }
