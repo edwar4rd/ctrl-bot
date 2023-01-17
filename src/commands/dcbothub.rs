@@ -9,6 +9,8 @@ use crate::prelude::*;
     prefix_command,
     subcommands(
         "list",
+        "list_existing",
+        "list_executing",
         "list_status",
         "list_tasks",
         "status",
@@ -18,7 +20,13 @@ use crate::prelude::*;
         // "pull",
         // "start",
         // "msg",
+        // "verify",
         // "kill",
+        "control_restart",
+        // "terminate",
+        // "conclude",
+        // "wait",
+        // "finish",
         // "exit",
     )
 )]
@@ -52,11 +60,97 @@ async fn list(ctx: Context<'_>) -> Result<(), Error> {
         .parse::<u32>()
         .unwrap();
     let bot_list = stdin_reader.next().await.unwrap().unwrap();
-    ctx.say(format!(
-        "Loaded bots: \n- `{}\n`",
-        bot_list.replace(' ', "`\n- `")
-    ))
-    .await?;
+    if bot_list != "" {
+        ctx.say(format!(
+            "Loaded bots: \n- `{}\n`",
+            bot_list.replace(' ', "`\n- `")
+        ))
+        .await?;
+    } else {
+        ctx.say("None").await?;
+    }
+
+    drop(stdin_reader);
+    drop(stdio_lock);
+    Ok(())
+}
+
+/// list every running/exited bot in a line
+#[poise::command(slash_command, prefix_command, rename = "list-existing")]
+async fn list_existing(ctx: Context<'_>) -> Result<(), Error> {
+    let stdio_lock = match timeout(
+        tokio::time::Duration::from_secs(30),
+        ctx.data().stdio_lock.lock(),
+    )
+    .await
+    {
+        Ok(lock) => lock,
+        Err(_) => {
+            ctx.say("Failed getting data from bothub.").await?;
+            return Ok(());
+        }
+    };
+
+    let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
+    println!("list-existing");
+    stdin_reader
+        .next()
+        .await
+        .unwrap()
+        .unwrap()
+        .parse::<u32>()
+        .unwrap();
+    let bot_list = stdin_reader.next().await.unwrap().unwrap();
+    if bot_list != "" {
+        ctx.say(format!(
+            "Existing bots: \n- `{}\n`",
+            bot_list.replace(' ', "`\n- `")
+        ))
+        .await?;
+    } else {
+        ctx.say("None").await?;
+    }
+
+    drop(stdin_reader);
+    drop(stdio_lock);
+    Ok(())
+}
+
+/// list every running/exited task in a line
+#[poise::command(slash_command, prefix_command, rename = "list-executing")]
+async fn list_executing(ctx: Context<'_>) -> Result<(), Error> {
+    let stdio_lock = match timeout(
+        tokio::time::Duration::from_secs(30),
+        ctx.data().stdio_lock.lock(),
+    )
+    .await
+    {
+        Ok(lock) => lock,
+        Err(_) => {
+            ctx.say("Failed getting data from bothub.").await?;
+            return Ok(());
+        }
+    };
+
+    let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
+    println!("list-executing");
+    stdin_reader
+        .next()
+        .await
+        .unwrap()
+        .unwrap()
+        .parse::<u32>()
+        .unwrap();
+    let task_list = stdin_reader.next().await.unwrap().unwrap();
+    if task_list != "" {
+        ctx.say(format!(
+            "Tasks: \n- `{}\n`",
+            task_list.replace(' ', "`\n- `")
+        ))
+        .await?;
+    } else {
+        ctx.say("None").await?;
+    }
 
     drop(stdin_reader);
     drop(stdio_lock);
@@ -180,11 +274,80 @@ async fn status(
         ctx.say(format!("Bot status:\n```\n{}```", bot_status))
             .await?;
     } else {
-        ctx.say(format!("Bot\n```\n{}\n```isn't found in bot list and is filtered for security reasons.", botname))
-            .await?;
+        ctx.say(format!(
+            "Bot\n```\n{}\n```isn't found in bot list and is filtered for security reasons.",
+            botname
+        ))
+        .await?;
     }
 
     Ok(())
+}
+
+/// kill the control bot (hey that's me), then attempt to restart it
+#[poise::command(slash_command, prefix_command, rename = "control-restart")]
+async fn control_restart(ctx: Context<'_>) -> Result<(), Error> {
+    ctx.send(|msg| {
+        msg.content("Click to RESTART the bot")
+            .ephemeral(true)
+            .components(|comp| {
+                comp.create_action_row(|row| {
+                    row.create_button(|btn| {
+                        btn.custom_id("ctrl_restart.btn")
+                            .style(serenity::ButtonStyle::Danger)
+                            .label("RESTART")
+                    })
+                })
+            })
+    })
+    .await?;
+    Ok(())
+}
+
+pub async fn ctrl_restart_btn_handler<'a>(
+    ctx: &serenity::Context,
+    interaction: &ResponsibleInteraction<'a>,
+) -> Result<(), Error> {
+    if !auth::authenticate(&ctx, &interaction, "ctrl_restart").await? {
+        interaction
+            .create_followup_message(&ctx, |msg| {
+                msg.ephemeral(true)
+                    .content("Don't even try to stop me lol\n")
+            })
+            .await?;
+        Ok(())
+    } else {
+        interaction
+            .create_followup_message(&ctx, |msg| {
+                msg.ephemeral(true)
+                    .content("Restarting the bot in 10 seconds...")
+            })
+            .await?;
+        eprintln!("Restarting the bot in 10 seconds...");
+        eprintln!("Triggered by {}", interaction.user());
+        ctx.set_presence(None, serenity::OnlineStatus::DoNotDisturb)
+            .await;
+        tokio::time::sleep(Duration::from_secs(10)).await;
+        eprintln!("Stopping the bot...");
+        match ctx.data.read().await.get::<ShardManagerContainer>() {
+            Some(v) => v,
+            None => {
+                interaction
+                    .create_followup_message(&ctx, |msg| {
+                        msg.ephemeral(true).content("Failed stopping the bot...")
+                    })
+                    .await?;
+                eprintln!("Failed stopping the bot...");
+                return Ok(());
+            }
+        }
+        .lock()
+        .await
+        .shutdown_all()
+        .await;
+        println!("control-restart");
+        Ok(())
+    }
 }
 
 async fn autocomplete_botname<'a>(ctx: Context<'_>, partial: &'a str) -> Vec<String> {
@@ -211,8 +374,69 @@ async fn autocomplete_botname<'a>(ctx: Context<'_>, partial: &'a str) -> Vec<Str
         "".to_string()
     };
 
-    // futures::stream::iter().to_owned().map(|name| name.to_string())
     bot_list
+        .split(' ')
+        .filter(|name| name.starts_with(partial))
+        .map(|name| name.to_string())
+        .collect::<Vec<String>>()
+}
+
+async fn autocomplete_ebotname<'a>(ctx: Context<'_>, partial: &'a str) -> Vec<String> {
+    let bot_list = if let Ok(stdio_lock) = timeout(
+        tokio::time::Duration::from_secs(30),
+        ctx.data().stdio_lock.lock(),
+    )
+    .await
+    {
+        let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
+        println!("list-existing");
+        stdin_reader
+            .next()
+            .await
+            .unwrap()
+            .unwrap()
+            .parse::<u32>()
+            .unwrap();
+        let bot_list = stdin_reader.next().await.unwrap().unwrap();
+        drop(stdin_reader);
+        drop(stdio_lock);
+        bot_list
+    } else {
+        "".to_string()
+    };
+
+    bot_list
+        .split(' ')
+        .filter(|name| name.starts_with(partial))
+        .map(|name| name.to_string())
+        .collect::<Vec<String>>()
+}
+
+async fn autocomplete_taskid<'a>(ctx: Context<'_>, partial: &'a str) -> Vec<String> {
+    let task_list = if let Ok(stdio_lock) = timeout(
+        tokio::time::Duration::from_secs(30),
+        ctx.data().stdio_lock.lock(),
+    )
+    .await
+    {
+        let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
+        println!("list-executing");
+        stdin_reader
+            .next()
+            .await
+            .unwrap()
+            .unwrap()
+            .parse::<u32>()
+            .unwrap();
+        let bot_list = stdin_reader.next().await.unwrap().unwrap();
+        drop(stdin_reader);
+        drop(stdio_lock);
+        bot_list
+    } else {
+        "".to_string()
+    };
+
+    task_list
         .split(' ')
         .filter(|name| name.starts_with(partial))
         .map(|name| name.to_string())

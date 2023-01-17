@@ -36,6 +36,14 @@ async fn handler(
                             )
                             .await?
                         }
+                        #[cfg(feature = "dcbothub")]
+                        if interaction.data.custom_id == "ctrl_restart.btn" {
+                            commands::dcbothub::ctrl_restart_btn_handler(
+                                ctx,
+                                &ResponsibleInteraction::MessageComponent(&interaction),
+                            )
+                            .await?
+                        }
                     }
                     _ => {}
                 }
@@ -105,7 +113,7 @@ async fn main() {
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                 ctx.set_presence(
-                    Some(serenity::Activity::watching("學測倒數多少天 👀")),
+                    Some(serenity::Activity::watching("分科倒數多少天 👀")),
                     serenity::OnlineStatus::Idle,
                 )
                 .await;
@@ -133,4 +141,9 @@ async fn main() {
             .unwrap()
             .as_secs()
     );
+
+    #[cfg(feature = "dcbothub")]
+    {
+        println!("exit\n");
+    }
 }
