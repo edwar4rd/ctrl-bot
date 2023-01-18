@@ -1,4 +1,4 @@
-use dc_bot::prelude::*;
+use ctrl_bot::prelude::*;
 
 #[cfg(feature = "handler")]
 async fn handler(
