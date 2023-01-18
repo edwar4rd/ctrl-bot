@@ -193,6 +193,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ctrl-bot"
+version = "0.0.8"
+dependencies = [
+ "base64 0.13.1",
+ "build-time",
+ "poise",
+ "rand",
+ "rsa",
+ "sha3",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
 name = "cxx"
 version = "1.0.86"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -283,20 +297,6 @@ dependencies = [
  "once_cell",
  "parking_lot_core",
  "serde",
-]
-
-[[package]]
-name = "dc-bot"
-version = "0.0.8"
-dependencies = [
- "base64 0.13.1",
- "build-time",
- "poise",
- "rand",
- "rsa",
- "sha3",
- "tokio",
- "tokio-util",
 ]
 
 [[package]]
