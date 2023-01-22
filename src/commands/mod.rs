@@ -44,5 +44,8 @@ pub mod tools;
 #[cfg(feature="dcbothub")]
 pub mod dcbothub;
 
+#[cfg(feature="shell")]
+pub mod shell;
+
 // #[cfg(all(feature = "stdio_tests", feature = "dcbothub"))]
 // compile_error!("feature \"stdio_tests\" and feature \"dcbothub\" shouldn't be enabled at the same time");

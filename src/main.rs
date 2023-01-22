@@ -91,6 +91,11 @@ async fn main() {
         commands.push(commands::dcbothub::bothub());
     }
 
+    #[cfg(feature = "shell")]
+    {
+        commands.push(commands::shell::shell());
+    }
+
     commands.push(commands::help());
     commands.push(commands::botinfo());
 

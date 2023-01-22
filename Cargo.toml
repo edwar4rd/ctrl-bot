@@ -20,10 +20,11 @@ build-time = "0.1.0"
 poise = "0.5.2"
 
 [features]
-default = ["dcbothub", "tools"]
+default = ["dcbothub", "tools", "shell"]
 random = []
 stdio_tests = []
 modal_tests = ["handler"]
 tools = ["handler"]
 dcbothub = []
 handler = []
+shell = []
