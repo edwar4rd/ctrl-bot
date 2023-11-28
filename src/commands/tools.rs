@@ -212,6 +212,7 @@ pub async fn ping(
     Ok(())
 }
 
+/// Shutdown the bot
 #[poise::command(slash_command, prefix_command)]
 pub async fn stop(ctx: Context<'_>) -> Result<(), Error> {
     ctx.send(|msg| {

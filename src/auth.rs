@@ -1,7 +1,9 @@
 // Helper function that verify the authenticity of a action
 
 use crate::prelude::*;
-use rsa::{pkcs8::DecodePublicKey, PaddingScheme, PublicKey};
+use base64::Engine;
+use rsa::{pkcs8::DecodePublicKey, RsaPublicKey};
+use rsa::pkcs1v15::Pkcs1v15Sign;
 use sha3::{Digest, Sha3_512};
 use std::iter;
 use std::time;
@@ -16,7 +18,7 @@ pub async fn authenticate<'a>(
         .collect::<Vec<u8>>();
     let challenge_encoded = format!(
         "{}_{}_{}_{}\n",
-        base64::encode(&challenge_random),
+        base64::engine::general_purpose::STANDARD.encode(&challenge_random),
         interaction.user(),
         time::SystemTime::now()
             .duration_since(time::UNIX_EPOCH)
@@ -100,7 +102,7 @@ pub async fn authenticate<'a>(
     if let serenity::ActionRowComponent::InputText(text) =
         &modal_reply_react.data.components[0].components[0]
     {
-        if let Ok(signed) = base64::decode(
+        if let Ok(signed) = base64::engine::general_purpose::STANDARD.decode(
             &text
                 .value
                 .trim()
@@ -113,7 +115,7 @@ pub async fn authenticate<'a>(
             let mut my_hasher = Sha3_512::new();
             my_hasher.update(challenge_encoded);
             let hashed = my_hasher.finalize();
-            if rsa::RsaPublicKey::from_public_key_pem(
+            if RsaPublicKey::from_public_key_pem(
                 "-----BEGIN PUBLIC KEY-----
 MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAo7/fmoTQhWboiCHpuGF3
 DmAmyeTZEvaGvAKzUeabnds9iA0UCCm5kPRKK0kWGj/xpBJxzyCRzxUvKvPtY02/
@@ -132,7 +134,7 @@ Dy7uxt3qNoJykUCNUqlNBNUCAwEAAQ==
             )
             .unwrap()
             .verify(
-                PaddingScheme::new_pkcs1v15_sign::<Sha3_512>(),
+                Pkcs1v15Sign::new::<Sha3_512>(),
                 &hashed,
                 &signed,
             )
