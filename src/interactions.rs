@@ -1,190 +1,151 @@
+use poise::serenity_prelude::{
+    CreateInteractionResponse, CreateInteractionResponseFollowup, EditInteractionResponse,
+};
+
 use crate::prelude::*;
 
 pub enum ResponsibleInteraction<'a> {
-    ApplicationCommand(&'a serenity::ApplicationCommandInteraction),
-    MessageComponent(&'a serenity::MessageComponentInteraction),
-    ModalSubmit(&'a serenity::ModalSubmitInteraction),
+    ApplicationCommand(&'a serenity::CommandInteraction),
+    MessageComponent(&'a serenity::ComponentInteraction),
+    ModalSubmit(&'a serenity::ModalInteraction),
 }
 
 impl<'a> ResponsibleInteraction<'a> {
-    pub async fn get_interaction_response(
+    pub async fn get_response(
         &self,
         http: impl AsRef<serenity::Http>,
     ) -> serenity::Result<serenity::Message> {
         match &self {
             Self::ApplicationCommand(application_command) => {
-                application_command.get_interaction_response(http).await
+                application_command.get_response(http).await
             }
-            Self::MessageComponent(message_component) => {
-                message_component.get_interaction_response(http).await
-            }
-            Self::ModalSubmit(modal_submit) => modal_submit.get_interaction_response(http).await,
+            Self::MessageComponent(message_component) => message_component.get_response(http).await,
+            Self::ModalSubmit(modal_submit) => modal_submit.get_response(http).await,
         }
     }
 
-    pub async fn create_interaction_response<F>(
+    pub async fn create_response(
         &self,
-        http: impl AsRef<serenity::Http>,
-        f: F,
-    ) -> serenity::Result<()>
-    where
-        for<'b> F: FnOnce(
-            &'b mut serenity::CreateInteractionResponse<'a>,
-        ) -> &'b mut serenity::CreateInteractionResponse<'a>,
-    {
-        match &self {
-            Self::ApplicationCommand(application_command) => {
-                application_command
-                    .create_interaction_response(http, f)
-                    .await
-            }
-            Self::MessageComponent(message_component) => {
-                message_component.create_interaction_response(http, f).await
-            }
-            Self::ModalSubmit(modal_submit) => {
-                modal_submit.create_interaction_response(http, f).await
-            }
-        }
-    }
-
-    pub async fn edit_original_interaction_response<F>(
-        &self,
-        http: impl AsRef<serenity::Http>,
-        f: F,
-    ) -> serenity::Result<serenity::Message>
-    where
-        F: FnOnce(&mut serenity::EditInteractionResponse) -> &mut serenity::EditInteractionResponse,
-    {
-        match &self {
-            Self::ApplicationCommand(application_command) => {
-                application_command
-                    .edit_original_interaction_response(http, f)
-                    .await
-            }
-            Self::MessageComponent(message_component) => {
-                message_component
-                    .edit_original_interaction_response(http, f)
-                    .await
-            }
-            Self::ModalSubmit(modal_submit) => {
-                modal_submit
-                    .edit_original_interaction_response(http, f)
-                    .await
-            }
-        }
-    }
-
-    pub async fn delete_original_interaction_response(
-        &self,
-        http: impl AsRef<serenity::Http>,
+        cache_http: impl serenity::CacheHttp,
+        builder: CreateInteractionResponse,
     ) -> serenity::Result<()> {
         match &self {
             Self::ApplicationCommand(application_command) => {
                 application_command
-                    .delete_original_interaction_response(http)
+                    .create_response(cache_http, builder)
                     .await
             }
             Self::MessageComponent(message_component) => {
-                message_component
-                    .delete_original_interaction_response(http)
-                    .await
+                message_component.create_response(cache_http, builder).await
             }
             Self::ModalSubmit(modal_submit) => {
-                modal_submit
-                    .delete_original_interaction_response(http)
-                    .await
+                modal_submit.create_response(cache_http, builder).await
             }
         }
     }
 
-    pub async fn create_followup_message<F>(
+    pub async fn edit_response(
         &self,
-        http: impl AsRef<serenity::Http>,
-        f: F,
-    ) -> serenity::Result<serenity::Message>
-    where
-        for<'b> F: FnOnce(
-            &'b mut serenity::CreateInteractionResponseFollowup<'a>,
-        ) -> &'b mut serenity::CreateInteractionResponseFollowup<'a>,
-    {
+        cache_http: impl serenity::CacheHttp,
+        builder: EditInteractionResponse,
+    ) -> serenity::Result<serenity::Message> {
         match &self {
             Self::ApplicationCommand(application_command) => {
-                application_command.create_followup_message(http, f).await
+                application_command.edit_response(cache_http, builder).await
             }
             Self::MessageComponent(message_component) => {
-                message_component.create_followup_message(http, f).await
+                message_component.edit_response(cache_http, builder).await
             }
-            Self::ModalSubmit(modal_submit) => modal_submit.create_followup_message(http, f).await,
+            Self::ModalSubmit(modal_submit) => {
+                modal_submit.edit_response(cache_http, builder).await
+            }
         }
     }
 
-    pub async fn edit_followup_message<F, M: Into<serenity::MessageId>>(
+    pub async fn delete_response(&self, http: impl AsRef<serenity::Http>) -> serenity::Result<()> {
+        match &self {
+            Self::ApplicationCommand(application_command) => {
+                application_command.delete_response(http).await
+            }
+            Self::MessageComponent(message_component) => {
+                message_component.delete_response(http).await
+            }
+            Self::ModalSubmit(modal_submit) => modal_submit.delete_response(http).await,
+        }
+    }
+
+    pub async fn create_followup(
         &self,
-        http: impl AsRef<serenity::Http>,
-        message_id: M,
-        f: F,
-    ) -> serenity::Result<serenity::Message>
-    where
-        for<'b> F: FnOnce(
-            &'b mut serenity::CreateInteractionResponseFollowup<'a>,
-        ) -> &'b mut serenity::CreateInteractionResponseFollowup<'a>,
-    {
+        cache_http: impl serenity::CacheHttp,
+        builder: CreateInteractionResponseFollowup,
+    ) -> serenity::Result<serenity::Message> {
         match &self {
             Self::ApplicationCommand(application_command) => {
                 application_command
-                    .edit_followup_message(http, message_id, f)
+                    .create_followup(cache_http, builder)
+                    .await
+            }
+            Self::MessageComponent(message_component) => {
+                message_component.create_followup(cache_http, builder).await
+            }
+            Self::ModalSubmit(modal_submit) => {
+                modal_submit.create_followup(cache_http, builder).await
+            }
+        }
+    }
+
+    pub async fn edit_followup<M: Into<serenity::MessageId>>(
+        &self,
+        cache_http: impl serenity::CacheHttp,
+        message_id: M,
+        builder: CreateInteractionResponseFollowup,
+    ) -> serenity::Result<serenity::Message> {
+        match &self {
+            Self::ApplicationCommand(application_command) => {
+                application_command
+                    .edit_followup(cache_http, message_id, builder)
                     .await
             }
             Self::MessageComponent(message_component) => {
                 message_component
-                    .edit_followup_message(http, message_id, f)
+                    .edit_followup(cache_http, message_id, builder)
                     .await
             }
             Self::ModalSubmit(modal_submit) => {
                 modal_submit
-                    .edit_followup_message(http, message_id, f)
+                    .edit_followup(cache_http, message_id, builder)
                     .await
             }
         }
     }
 
-    pub async fn delete_followup_message<M: Into<serenity::MessageId>>(
+    pub async fn delete_followup<M: Into<serenity::MessageId>>(
         &self,
         http: impl AsRef<serenity::Http>,
         message_id: M,
     ) -> serenity::Result<()> {
         match &self {
             Self::ApplicationCommand(application_command) => {
-                application_command
-                    .delete_followup_message(http, message_id)
-                    .await
+                application_command.delete_followup(http, message_id).await
             }
             Self::MessageComponent(message_component) => {
-                message_component
-                    .delete_followup_message(http, message_id)
-                    .await
+                message_component.delete_followup(http, message_id).await
             }
-            Self::ModalSubmit(modal_submit) => {
-                modal_submit.delete_followup_message(http, message_id).await
-            }
+            Self::ModalSubmit(modal_submit) => modal_submit.delete_followup(http, message_id).await,
         }
     }
 
-    pub async fn get_followup_message<M: Into<serenity::MessageId>>(
+    pub async fn get_followup<M: Into<serenity::MessageId>>(
         &self,
         http: impl AsRef<serenity::Http>,
         message_id: M,
     ) -> serenity::Result<serenity::Message> {
         match &self {
             Self::ApplicationCommand(application_command) => {
-                application_command
-                    .get_followup_message(http, message_id)
-                    .await
+                application_command.get_followup(http, message_id).await
             }
             Self::MessageComponent(message_component) => {
-                message_component
-                    .get_followup_message(http, message_id)
-                    .await
+                message_component.get_followup(http, message_id).await
             }
             Self::ModalSubmit(modal_submit) => {
                 http.as_ref()
@@ -194,11 +155,13 @@ impl<'a> ResponsibleInteraction<'a> {
         }
     }
 
-    pub async fn defer(&self, http: impl AsRef<serenity::Http>) -> serenity::Result<()> {
+    pub async fn defer(&self, cache_http: impl serenity::CacheHttp) -> serenity::Result<()> {
         match &self {
-            Self::ApplicationCommand(application_command) => application_command.defer(http).await,
-            Self::MessageComponent(message_component) => message_component.defer(http).await,
-            Self::ModalSubmit(modal_submit) => modal_submit.defer(http).await,
+            Self::ApplicationCommand(application_command) => {
+                application_command.defer(cache_http).await
+            }
+            Self::MessageComponent(message_component) => message_component.defer(cache_http).await,
+            Self::ModalSubmit(modal_submit) => modal_submit.defer(cache_http).await,
         }
     }
 

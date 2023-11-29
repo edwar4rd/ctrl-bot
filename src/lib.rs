@@ -8,6 +8,7 @@ pub mod auth;
 pub mod prelude {
     pub use crate::auth;
     pub use crate::commands;
+    use poise::CommandInteractionType;
     pub use poise::{
         serenity_prelude as serenity,
         Context::{Application, Prefix},
@@ -16,7 +17,6 @@ pub mod prelude {
     pub use std::net::IpAddr;
     // pub use sha3::{Digest, Sha3_512};
     pub use crate::ResponsibleInteraction;
-    pub use poise::ApplicationCommandOrAutocompleteInteraction;
     pub use std::process::Command;
     pub use std::time::Duration;
 
@@ -30,27 +30,32 @@ pub mod prelude {
     }
     pub struct ShardManagerContainer;
 
-    impl serenity::TypeMapKey for ShardManagerContainer {
+    impl serenity::prelude::TypeMapKey for ShardManagerContainer {
         type Value = std::sync::Arc<tokio::sync::Mutex<serenity::ShardManager>>;
     }
 
-    pub fn slash_ctx_as_responsibe_interaction<'a>(ctx: &'a Context<'_>) -> ResponsibleInteraction<'a> {
+    pub fn slash_ctx_as_responsibe_interaction<'a>(
+        ctx: &'a Context<'_>,
+    ) -> ResponsibleInteraction<'a> {
         match &ctx {
-            Application(application_context) => match application_context.interaction {
-                ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(interaction) => {
-                    ResponsibleInteraction::ApplicationCommand(interaction)
-                }
-                _ => {
-                    unreachable!()
-                }
-            },
+            Application(application_context) => {
+                assert_eq!(
+                    application_context.interaction_type,
+                    CommandInteractionType::Command
+                );
+                ResponsibleInteraction::ApplicationCommand(application_context.interaction)
+            }
             _ => {
                 unreachable!();
             }
         }
     }
 
-    pub async fn autosplit_output<'a>(ctx: &'a Context<'_>, interaction: &'a ResponsibleInteraction<'a>, content: &'a String) -> Result<(), Error> {
+    pub async fn autosplit_output<'a>(
+        ctx: &'a Context<'_>,
+        interaction: &'a ResponsibleInteraction<'a>,
+        content: &'a String,
+    ) -> Result<(), Error> {
         let response = if content.len() > 1990 {
             let mut lines = content.lines();
             let mut current = String::new();
@@ -59,10 +64,12 @@ pub mod prelude {
                     Some(line) => {
                         if current.len() + line.len() > 1990 {
                             interaction
-                                .create_followup_message(&ctx, |msg| {
-                                    msg.ephemeral(true)
-                                        .content(format!("```{}```", current))
-                                })
+                                .create_followup(
+                                    &ctx,
+                                    serenity::CreateInteractionResponseFollowup::new()
+                                        .ephemeral(true)
+                                        .content(format!("```{}```", current)),
+                                )
                                 .await?;
                             current.clear();
                         }
@@ -78,8 +85,13 @@ pub mod prelude {
             format!("```{content}```")
         };
         interaction
-        .create_followup_message(&ctx, |msg| msg.ephemeral(true).content(response))
-        .await?;
+            .create_followup(
+                &ctx,
+                serenity::CreateInteractionResponseFollowup::new()
+                    .ephemeral(true)
+                    .content(response),
+            )
+            .await?;
         Ok(())
     }
 }
