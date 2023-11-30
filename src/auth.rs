@@ -2,8 +2,8 @@
 
 use crate::prelude::*;
 use base64::Engine;
-use rsa::{pkcs8::DecodePublicKey, RsaPublicKey};
 use rsa::pkcs1v15::Pkcs1v15Sign;
+use rsa::{pkcs8::DecodePublicKey, RsaPublicKey};
 use sha3::{Digest, Sha3_512};
 use std::iter;
 use std::time;
@@ -133,11 +133,7 @@ Dy7uxt3qNoJykUCNUqlNBNUCAwEAAQ==
 ",
             )
             .unwrap()
-            .verify(
-                Pkcs1v15Sign::new::<Sha3_512>(),
-                &hashed,
-                &signed,
-            )
+            .verify(Pkcs1v15Sign::new::<Sha3_512>(), &hashed, &signed)
             .is_ok()
             {
                 modal_reply_react

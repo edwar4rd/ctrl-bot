@@ -32,19 +32,19 @@ pub async fn botinfo(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-#[cfg(feature="random")]
+#[cfg(feature = "random")]
 pub mod random;
 
-#[cfg(any(feature="stdio_tests", feature="modal_tests"))]
+#[cfg(any(feature = "stdio_tests", feature = "modal_tests"))]
 pub mod tests;
 
-#[cfg(feature="tools")]
+#[cfg(feature = "tools")]
 pub mod tools;
 
-#[cfg(feature="dcbothub")]
+#[cfg(feature = "dcbothub")]
 pub mod dcbothub;
 
-#[cfg(feature="shell")]
+#[cfg(feature = "shell")]
 pub mod shell;
 
 // #[cfg(all(feature = "stdio_tests", feature = "dcbothub"))]
