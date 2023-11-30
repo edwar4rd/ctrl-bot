@@ -15,38 +15,44 @@ pub async fn shell(
     .await?
     {
         interaction
-            .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+            .create_followup(&ctx, default_auth_fail_response())
             .await?;
         return Ok(());
     }
     interaction
-        .create_followup_message(&ctx, |msg| {
-            msg.ephemeral(true).content("Executing command...")
-        })
+        .create_followup(
+            &ctx,
+            serenity::CreateInteractionResponseFollowup::new()
+                .ephemeral(true)
+                .content("Executing command..."),
+        )
         .await?;
     let child = std::process::Command::new("bash")
         .arg("-c")
         .arg(command)
         .output();
     interaction
-        .create_followup_message(&ctx, |msg| {
-            msg.ephemeral(true).content(match child {
-                Ok(output) => format!(
-                    "Stdout: \n```{}```\nStderr: \n```{}```\n",
-                    if std::str::from_utf8(&output.stdout).unwrap().trim().len() > 0 {
-                        std::str::from_utf8(&output.stdout).unwrap()
-                    } else {
-                        "(None)\n"
-                    },
-                    if std::str::from_utf8(&output.stderr).unwrap().trim().len() > 0 {
-                        std::str::from_utf8(&output.stderr).unwrap()
-                    } else {
-                        "(None)\n"
-                    },
-                ),
-                Err(_) => "Command failed to execute!".to_string(),
-            })
-        })
+        .create_followup(
+            &ctx,
+            serenity::CreateInteractionResponseFollowup::new()
+                .ephemeral(true)
+                .content(match child {
+                    Ok(output) => format!(
+                        "Stdout: \n```{}```\nStderr: \n```{}```\n",
+                        if std::str::from_utf8(&output.stdout).unwrap().trim().len() > 0 {
+                            std::str::from_utf8(&output.stdout).unwrap()
+                        } else {
+                            "(None)\n"
+                        },
+                        if std::str::from_utf8(&output.stderr).unwrap().trim().len() > 0 {
+                            std::str::from_utf8(&output.stderr).unwrap()
+                        } else {
+                            "(None)\n"
+                        },
+                    ),
+                    Err(_) => "Command failed to execute!".to_string(),
+                }),
+        )
         .await?;
     Ok(())
 }

@@ -94,4 +94,10 @@ pub mod prelude {
             .await?;
         Ok(())
     }
+
+    pub fn default_auth_fail_response() -> serenity::CreateInteractionResponseFollowup {
+        serenity::CreateInteractionResponseFollowup::new()
+            .ephemeral(true)
+            .content("Nope!\n")
+    }
 }

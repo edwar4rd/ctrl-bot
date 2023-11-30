@@ -27,26 +27,47 @@ pub async fn authenticate<'a>(
         action_data
     );
 
-    interaction.create_interaction_response(&ctx, |response| response
-        .kind(serenity::InteractionResponseType::ChannelMessageWithSource)
-        .interaction_response_data(|msg| msg
+    let challenge_message = format!("Please authenticate by signing this random message(including the newline) with your secret key:
+    ```{challenge_encoded}```
+    
+    ```openssl dgst -sha3-512 -sign privkey.pem | openssl enc -base64```");
+    let challenge_components: Vec<serenity::CreateActionRow> =
+        vec![serenity::CreateActionRow::Buttons(vec![
+            serenity::CreateButton::new("authenticate.button")
+                .label("Submit signed")
+                .style(serenity::ButtonStyle::Primary),
+        ])];
+    let challenge_message = serenity::CreateInteractionResponseMessage::new()
+        .ephemeral(true)
+        .content(challenge_message)
+        .components(challenge_components);
+    let challenge_builder = serenity::CreateInteractionResponse::Message(challenge_message);
+    interaction.create_response(&ctx, challenge_builder).await?;
+
+    let too_slow_response_followup: serenity::CreateInteractionResponseFollowup =
+        serenity::CreateInteractionResponseFollowup::new()
             .ephemeral(true)
-            .content(format!("Please authenticate by signing this random message(including the newline) with your secret key:
-```{challenge_encoded}```
+            .content("(Too slow!!)");
+    let succeeded_response: serenity::CreateInteractionResponse =
+        serenity::CreateInteractionResponse::Message(
+            serenity::CreateInteractionResponseMessage::new()
+                .ephemeral(true)
+                .content("(Authentication Succeeded!)"),
+        );
+    let failed_response: serenity::CreateInteractionResponse =
+        serenity::CreateInteractionResponse::Message(
+            serenity::CreateInteractionResponseMessage::new()
+                .ephemeral(true)
+                .content("(Authentication Failed!)"),
+        );
+    let fail_to_parse_response: serenity::CreateInteractionResponse =
+        serenity::CreateInteractionResponse::Message(
+            serenity::CreateInteractionResponseMessage::new()
+                .ephemeral(true)
+                .content("(Failed to parse responsed message)"),
+        );
 
-```openssl dgst -sha3-512 -sign privkey.pem | openssl enc -base64```"))
-            .components(|components| components
-                .create_action_row(|row| row
-                    .create_button(|btn| btn
-                        .custom_id("authenticate.button")
-                        .label("Submit signed")
-                        .style(serenity::ButtonStyle::Primary)
-                    )
-                )
-            ))
-        ).await?;
-
-    let btn_reply = interaction.get_interaction_response(&ctx).await?;
+    let btn_reply = interaction.get_response(&ctx).await?;
 
     let btn_reply_react = match btn_reply
         .await_component_interaction(&ctx)
@@ -56,34 +77,30 @@ pub async fn authenticate<'a>(
         Some(react) => react,
         None => {
             interaction
-                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("(Too slow!)"))
+                .create_followup(&ctx, too_slow_response_followup)
                 .await?;
             return Ok(false);
         }
     };
 
-    btn_reply_react
-        .create_interaction_response(&ctx, |response| {
-            response
-                .kind(serenity::InteractionResponseType::Modal)
-                .interaction_response_data(|modal| {
-                    modal
-                        .custom_id("authenticate.modal")
-                        .title("Submit signed message to authenticate")
-                        .components(|component| {
-                            component.create_action_row(|action_row| {
-                                action_row.create_input_text(|input_text| {
-                                    input_text
-                                        .style(serenity::InputTextStyle::Paragraph)
-                                        .required(true)
-                                        .custom_id("authenticate.modal.signed")
-                                        .label("signed message")
-                                })
-                            })
-                        })
-                })
-        })
-        .await?;
+    let auth_modal_components: Vec<serenity::CreateActionRow> =
+        vec![serenity::CreateActionRow::InputText(
+            serenity::CreateInputText::new(
+                serenity::InputTextStyle::Paragraph,
+                "signed message",
+                "authenticate.modal.signed",
+            )
+            .required(true),
+        )];
+    let auth_modal: serenity::CreateModal = serenity::CreateModal::new(
+        "authenticate.modal",
+        "Submit signed message to authenticate",
+    )
+    .components(auth_modal_components);
+    let auth_response: serenity::CreateInteractionResponse =
+        serenity::CreateInteractionResponse::Modal(auth_modal);
+
+    btn_reply_react.create_response(&ctx, auth_response).await?;
 
     let modal_reply_react = match btn_reply
         .await_modal_interaction(&ctx)
@@ -93,7 +110,7 @@ pub async fn authenticate<'a>(
         Some(react) => react,
         None => {
             btn_reply_react
-                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("(Too slow!)"))
+                .create_followup(&ctx, too_slow_response_followup)
                 .await?;
             return Ok(false);
         }
@@ -105,6 +122,8 @@ pub async fn authenticate<'a>(
         if let Ok(signed) = base64::engine::general_purpose::STANDARD.decode(
             &text
                 .value
+                .as_ref()
+                .unwrap_or(&String::default())
                 .trim()
                 .as_bytes()
                 .into_iter()
@@ -137,37 +156,18 @@ Dy7uxt3qNoJykUCNUqlNBNUCAwEAAQ==
             .is_ok()
             {
                 modal_reply_react
-                    .create_interaction_response(&ctx, |response| {
-                        response
-                            .kind(serenity::InteractionResponseType::ChannelMessageWithSource)
-                            .interaction_response_data(|msg| {
-                                msg.ephemeral(true).content("(Authentication Succeeded!)")
-                            })
-                    })
+                    .create_response(&ctx, succeeded_response)
                     .await?;
                 Ok(true)
             } else {
                 modal_reply_react
-                    .create_interaction_response(&ctx, |response| {
-                        response
-                            .kind(serenity::InteractionResponseType::ChannelMessageWithSource)
-                            .interaction_response_data(|msg| {
-                                msg.ephemeral(true).content("(Authentication Failed!)")
-                            })
-                    })
+                    .create_response(&ctx, failed_response)
                     .await?;
                 Ok(false)
             }
         } else {
             modal_reply_react
-                .create_interaction_response(&ctx, |response| {
-                    response
-                        .kind(serenity::InteractionResponseType::ChannelMessageWithSource)
-                        .interaction_response_data(|msg| {
-                            msg.ephemeral(true)
-                                .content("(Failed to parse responsed message)")
-                        })
-                })
+                .create_response(&ctx, fail_to_parse_response)
                 .await?;
             Ok(false)
         }

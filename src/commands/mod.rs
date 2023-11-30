@@ -21,14 +21,14 @@ pub async fn botinfo(ctx: Context<'_>) -> Result<(), Error> {
     use build_time::build_time_local;
 
     const VERSION: Option<&str> = option_env!("CARGO_PKG_VERSION");
-    ctx.send(|msg| {
-        msg.ephemeral(true).content(format!(
+    let botinfo_message: poise::CreateReply = poise::CreateReply::default()
+        .ephemeral(true)
+        .content(format!(
             "```version = {}\nbuild-time = {}```",
             VERSION.unwrap_or("UNKNOWN"),
             build_time_local!("%Y-%m-%d %H:%M:%S %:z")
-        ))
-    })
-    .await?;
+        ));
+    ctx.send(botinfo_message).await?;
     Ok(())
 }
 

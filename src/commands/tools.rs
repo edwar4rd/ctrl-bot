@@ -1,6 +1,19 @@
 /// Commands that serves as tools that provide information or control of the host computer of the bot and the bot itself
 use crate::prelude::*;
 
+fn neofetch_button_component() -> Vec<serenity::CreateActionRow> {
+    vec![serenity::CreateActionRow::Buttons(vec![
+        serenity::CreateButton::new("neofetch.btn")
+            .style(serenity::ButtonStyle::Primary)
+            .label("Neofetch!"),
+    ])]
+}
+fn neofetch_button_reply() -> poise::CreateReply {
+    poise::CreateReply::default()
+        .content("Click to perform neofetch")
+        .components(neofetch_button_component())
+}
+
 /// Prints system information output by neofetch
 #[poise::command(slash_command, prefix_command)]
 pub async fn neofetch(
@@ -10,56 +23,27 @@ pub async fn neofetch(
 ) -> Result<(), Error> {
     match button {
         Some(true) => {
-            ctx.send(|msg| {
-                msg.content("Click to perform neofetch").components(|comp| {
-                    comp.create_action_row(|row| {
-                        row.create_button(|btn| {
-                            btn.custom_id("neofetch.btn")
-                                .style(serenity::ButtonStyle::Primary)
-                                .label("Neofetch!")
-                        })
-                    })
-                })
-            })
-            .await?;
+            ctx.send(neofetch_button_reply()).await?;
             return Ok(());
         }
         _ => {}
     }
 
     let interaction = match &ctx {
-        Application(application_context) => match application_context.interaction {
-            ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(interaction) => {
-                interaction
-            }
-            _ => {
-                unreachable!()
-            }
-        },
+        Application(application_context) => {
+            assert_eq!(
+                application_context.interaction_type,
+                poise::CommandInteractionType::Command
+            );
+            ResponsibleInteraction::ApplicationCommand(application_context.interaction)
+        }
         Prefix(_) => {
-            ctx.send(|msg| {
-                msg.content("Click to perform neofetch").components(|comp| {
-                    comp.create_action_row(|row| {
-                        row.create_button(|btn| {
-                            btn.custom_id("neofetch.btn")
-                                .style(serenity::ButtonStyle::Primary)
-                                .label("Neofetch!")
-                        })
-                    })
-                })
-            })
-            .await?;
+            ctx.send(neofetch_button_reply()).await?;
             return Ok(());
         }
     };
 
-    let response = if auth::authenticate(
-        &ctx.serenity_context(),
-        &ResponsibleInteraction::ApplicationCommand(interaction),
-        "neofetch",
-    )
-    .await?
-    {
+    let response = if auth::authenticate(&ctx.serenity_context(), &interaction, "neofetch").await? {
         format!(
             "```{}```",
             String::from_utf8_lossy(
@@ -74,7 +58,12 @@ pub async fn neofetch(
         "Nope, wrong passcode lol\n".to_string()
     };
     interaction
-        .create_followup_message(&ctx, |msg| msg.ephemeral(true).content(response))
+        .create_followup(
+            &ctx,
+            serenity::CreateInteractionResponseFollowup::new()
+                .ephemeral(true)
+                .content(response),
+        )
         .await?;
     Ok(())
 }
@@ -98,7 +87,12 @@ pub async fn neofetch_btn_handler<'a>(
         "Nope, wrong passcode lol\n".to_string()
     };
     interaction
-        .create_followup_message(&ctx, |msg| msg.ephemeral(true).content(response))
+        .create_followup(
+            &ctx,
+            serenity::CreateInteractionResponseFollowup::new()
+                .ephemeral(true)
+                .content(response),
+        )
         .await?;
     Ok(())
 }
@@ -110,32 +104,20 @@ pub async fn ping(
     #[description = "a target IP adderss"] address: String,
     #[description = "Stop after sending count ECHO_REQUEST packets.(<=50)"] count: Option<u8>,
 ) -> Result<(), Error> {
-    let interaction = match &ctx {
-        Application(application_context) => match application_context.interaction {
-            ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(interaction) => {
-                interaction
-            }
-            _ => {
-                unreachable!()
-            }
-        },
-        _ => {
-            unreachable!();
-        }
-    };
+    let interaction = slash_ctx_as_responsibe_interaction(&ctx);
 
     let count: u8 = count.unwrap_or(4);
 
     if count > 50 {
         interaction
-            .create_interaction_response(&ctx, |response| {
-                response
-                    .kind(serenity::InteractionResponseType::ChannelMessageWithSource)
-                    .interaction_response_data(|msg| {
-                        msg.ephemeral(true)
-                            .content("Given `count` is greater than 50!")
-                    })
-            })
+            .create_response(
+                &ctx,
+                serenity::CreateInteractionResponse::Message(
+                    serenity::CreateInteractionResponseMessage::new()
+                        .ephemeral(true)
+                        .content("Given `count` is greater than 50!"),
+                ),
+            )
             .await?;
         return Ok(());
     }
@@ -144,14 +126,14 @@ pub async fn ping(
         Ok(address) => address,
         Err(_) => {
             interaction
-                .create_interaction_response(&ctx, |response| {
-                    response
-                        .kind(serenity::InteractionResponseType::ChannelMessageWithSource)
-                        .interaction_response_data(|msg| {
-                            msg.ephemeral(true)
-                                .content("Given `address` isn't valid Ipv4 address!")
-                        })
-                })
+                .create_response(
+                    &ctx,
+                    serenity::CreateInteractionResponse::Message(
+                        serenity::CreateInteractionResponseMessage::new()
+                            .ephemeral(true)
+                            .content("Given `address` isn't valid Ipv4 address!"),
+                    ),
+                )
                 .await?;
             return Ok(());
         }
@@ -159,7 +141,7 @@ pub async fn ping(
 
     let response = if auth::authenticate(
         &ctx.serenity_context(),
-        &ResponsibleInteraction::ApplicationCommand(interaction),
+        &interaction,
         &format!("{}_{}", count, address.to_string()),
     )
     .await?
@@ -182,10 +164,12 @@ pub async fn ping(
                             Some(line) => {
                                 if current.len() + line.len() > 1990 {
                                     interaction
-                                        .create_followup_message(&ctx, |msg| {
-                                            msg.ephemeral(true)
-                                                .content(format!("```{}```", current))
-                                        })
+                                        .create_followup(
+                                            &ctx,
+                                            serenity::CreateInteractionResponseFollowup::new()
+                                                .ephemeral(true)
+                                                .content(format!("```{}```", current)),
+                                        )
                                         .await?;
                                     current.clear();
                                 }
@@ -207,7 +191,12 @@ pub async fn ping(
         "Nope, wrong passcode lol\n".to_string()
     };
     interaction
-        .create_followup_message(&ctx, |msg| msg.ephemeral(true).content(response))
+        .create_followup(
+            &ctx,
+            serenity::CreateInteractionResponseFollowup::new()
+                .ephemeral(true)
+                .content(response),
+        )
         .await?;
     Ok(())
 }
@@ -215,19 +204,19 @@ pub async fn ping(
 /// Shutdown the bot
 #[poise::command(slash_command, prefix_command)]
 pub async fn stop(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.send(|msg| {
-        msg.content("Click to STOP the bot")
+    let stop_component: Vec<serenity::CreateActionRow> =
+        vec![serenity::CreateActionRow::Buttons(vec![
+            serenity::CreateButton::new("stop.btn")
+                .style(serenity::ButtonStyle::Danger)
+                .label("STOP"),
+        ])];
+
+    ctx.send(
+        poise::CreateReply::default()
+            .content("Click to STOP the bot")
             .ephemeral(true)
-            .components(|comp| {
-                comp.create_action_row(|row| {
-                    row.create_button(|btn| {
-                        btn.custom_id("stop.btn")
-                            .style(serenity::ButtonStyle::Danger)
-                            .label("STOP")
-                    })
-                })
-            })
-    })
+            .components(stop_component),
+    )
     .await?;
     return Ok(());
 }
@@ -238,32 +227,38 @@ pub async fn stop_btn_handler<'a>(
 ) -> Result<(), Error> {
     if !auth::authenticate(&ctx, &interaction, "stop").await? {
         interaction
-            .create_followup_message(&ctx, |msg| {
-                msg.ephemeral(true)
-                    .content("Don't even try to stop me lol\n")
-            })
+            .create_followup(
+                &ctx,
+                serenity::CreateInteractionResponseFollowup::new()
+                    .ephemeral(true)
+                    .content("Don't even try to stop me lol\n"),
+            )
             .await?;
         Ok(())
     } else {
         interaction
-            .create_followup_message(&ctx, |msg| {
-                msg.ephemeral(true)
-                    .content("Stopping the bot in 10 seconds...")
-            })
+            .create_followup(
+                &ctx,
+                serenity::CreateInteractionResponseFollowup::new()
+                    .ephemeral(true)
+                    .content("Stopping the bot in 10 seconds..."),
+            )
             .await?;
         eprintln!("Stopping the bot in 10 seconds...");
         eprintln!("Triggered by {}", interaction.user());
-        ctx.set_presence(None, serenity::OnlineStatus::DoNotDisturb)
-            .await;
+        ctx.set_presence(None, serenity::OnlineStatus::DoNotDisturb);
         tokio::time::sleep(Duration::from_secs(10)).await;
         eprintln!("Stopping the bot...");
         match ctx.data.read().await.get::<ShardManagerContainer>() {
             Some(v) => v,
             None => {
                 interaction
-                    .create_followup_message(&ctx, |msg| {
-                        msg.ephemeral(true).content("Failed stopping the bot...")
-                    })
+                    .create_followup(
+                        &ctx,
+                        serenity::CreateInteractionResponseFollowup::new()
+                            .ephemeral(true)
+                            .content("Failed stopping the bot..."),
+                    )
                     .await?;
                 eprintln!("Failed stopping the bot...");
 

@@ -3,6 +3,18 @@ use tokio::time::timeout;
 
 use crate::prelude::*;
 
+fn fail_sending_cmd_followup() -> serenity::CreateInteractionResponseFollowup {
+    serenity::CreateInteractionResponseFollowup::new()
+        .ephemeral(true)
+        .content("Failed sending command to bothub.")
+}
+
+fn result_followup(result: &str) -> serenity::CreateInteractionResponseFollowup {
+    serenity::CreateInteractionResponseFollowup::new()
+        .ephemeral(true)
+        .content(format!("Result:\n```\n{}```", result))
+}
+
 /// Execute commands of parent dcbothub process
 #[poise::command(
     slash_command,
@@ -354,7 +366,7 @@ async fn clean(
         .await?
         {
             interaction
-                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                .create_followup(&ctx, default_auth_fail_response())
                 .await?;
             return Ok(());
         }
@@ -368,10 +380,7 @@ async fn clean(
             Ok(lock) => lock,
             Err(_) => {
                 interaction
-                    .create_followup_message(ctx, |m| {
-                        m.ephemeral(true)
-                            .content("Failed sending command to bothub.")
-                    })
+                    .create_followup(ctx, fail_sending_cmd_followup())
                     .await?;
                 return Ok(());
             }
@@ -393,10 +402,7 @@ async fn clean(
         drop(stdio_lock);
 
         interaction
-            .create_followup_message(ctx, |m| {
-                m.ephemeral(true)
-                    .content(format!("Result:\n```\n{}```", command_result))
-            })
+            .create_followup(ctx, result_followup(&command_result))
             .await?;
     } else {
         ctx.say(format!(
@@ -428,7 +434,7 @@ async fn build(
         .await?
         {
             interaction
-                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                .create_followup(&ctx, default_auth_fail_response())
                 .await?;
             return Ok(());
         }
@@ -442,10 +448,7 @@ async fn build(
             Ok(lock) => lock,
             Err(_) => {
                 interaction
-                    .create_followup_message(ctx, |m| {
-                        m.ephemeral(true)
-                            .content("Failed sending command to bothub.")
-                    })
+                    .create_followup(ctx, fail_sending_cmd_followup())
                     .await?;
                 return Ok(());
             }
@@ -467,10 +470,7 @@ async fn build(
         drop(stdio_lock);
 
         interaction
-            .create_followup_message(ctx, |m| {
-                m.ephemeral(true)
-                    .content(format!("Result:\n```\n{}```", command_result))
-            })
+            .create_followup(ctx, result_followup(&command_result))
             .await?;
     } else {
         ctx.say(format!(
@@ -502,7 +502,7 @@ async fn pull(
         .await?
         {
             interaction
-                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                .create_followup(&ctx, default_auth_fail_response())
                 .await?;
             return Ok(());
         }
@@ -516,10 +516,7 @@ async fn pull(
             Ok(lock) => lock,
             Err(_) => {
                 interaction
-                    .create_followup_message(ctx, |m| {
-                        m.ephemeral(true)
-                            .content("Failed sending command to bothub.")
-                    })
+                    .create_followup(ctx, fail_sending_cmd_followup())
                     .await?;
                 return Ok(());
             }
@@ -541,10 +538,7 @@ async fn pull(
         drop(stdio_lock);
 
         interaction
-            .create_followup_message(ctx, |m| {
-                m.ephemeral(true)
-                    .content(format!("Result:\n```\n{}```", command_result))
-            })
+            .create_followup(ctx, result_followup(&command_result))
             .await?;
     } else {
         ctx.say(format!(
@@ -576,7 +570,7 @@ async fn start(
         .await?
         {
             interaction
-                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                .create_followup(&ctx, default_auth_fail_response())
                 .await?;
             return Ok(());
         }
@@ -590,10 +584,7 @@ async fn start(
             Ok(lock) => lock,
             Err(_) => {
                 interaction
-                    .create_followup_message(ctx, |m| {
-                        m.ephemeral(true)
-                            .content("Failed sending command to bothub.")
-                    })
+                    .create_followup(ctx, fail_sending_cmd_followup())
                     .await?;
                 return Ok(());
             }
@@ -615,10 +606,7 @@ async fn start(
         drop(stdio_lock);
 
         interaction
-            .create_followup_message(ctx, |m| {
-                m.ephemeral(true)
-                    .content(format!("Result:\n```\n{}```", command_result))
-            })
+            .create_followup(ctx, result_followup(&command_result))
             .await?;
     } else {
         ctx.say(format!(
@@ -651,7 +639,7 @@ async fn msg(
         .await?
         {
             interaction
-                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                .create_followup(&ctx, default_auth_fail_response())
                 .await?;
             return Ok(());
         }
@@ -665,10 +653,7 @@ async fn msg(
             Ok(lock) => lock,
             Err(_) => {
                 interaction
-                    .create_followup_message(ctx, |m| {
-                        m.ephemeral(true)
-                            .content("Failed sending command to bothub.")
-                    })
+                    .create_followup(ctx, fail_sending_cmd_followup())
                     .await?;
                 return Ok(());
             }
@@ -690,10 +675,7 @@ async fn msg(
         drop(stdio_lock);
 
         interaction
-            .create_followup_message(ctx, |m| {
-                m.ephemeral(true)
-                    .content(format!("Result:\n```\n{}```", command_result))
-            })
+            .create_followup(ctx, result_followup(&command_result))
             .await?;
     } else {
         ctx.say(format!(
@@ -727,7 +709,7 @@ async fn verify(
                 .await?
                 {
                     interaction
-                        .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                        .create_followup(&ctx, default_auth_fail_response())
                         .await?;
                     return Ok(());
                 }
@@ -741,10 +723,7 @@ async fn verify(
                     Ok(lock) => lock,
                     Err(_) => {
                         interaction
-                            .create_followup_message(ctx, |m| {
-                                m.ephemeral(true)
-                                    .content("Failed sending command to bothub.")
-                            })
+                            .create_followup(ctx, fail_sending_cmd_followup())
                             .await?;
                         return Ok(());
                     }
@@ -786,7 +765,7 @@ async fn verify(
             .await?
             {
                 interaction
-                    .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                    .create_followup(&ctx, default_auth_fail_response())
                     .await?;
                 return Ok(());
             }
@@ -800,10 +779,7 @@ async fn verify(
                 Ok(lock) => lock,
                 Err(_) => {
                     interaction
-                        .create_followup_message(ctx, |m| {
-                            m.ephemeral(true)
-                                .content("Failed sending command to bothub.")
-                        })
+                        .create_followup(ctx, fail_sending_cmd_followup())
                         .await?;
                     return Ok(());
                 }
@@ -852,7 +828,7 @@ async fn kill(
         .await?
         {
             interaction
-                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                .create_followup(&ctx, default_auth_fail_response())
                 .await?;
             return Ok(());
         }
@@ -866,10 +842,7 @@ async fn kill(
             Ok(lock) => lock,
             Err(_) => {
                 interaction
-                    .create_followup_message(ctx, |m| {
-                        m.ephemeral(true)
-                            .content("Failed sending command to bothub.")
-                    })
+                    .create_followup(ctx, fail_sending_cmd_followup())
                     .await?;
                 return Ok(());
             }
@@ -891,10 +864,7 @@ async fn kill(
         drop(stdio_lock);
 
         interaction
-            .create_followup_message(ctx, |m| {
-                m.ephemeral(true)
-                    .content(format!("Result:\n```\n{}```", command_result))
-            })
+            .create_followup(ctx, result_followup(&command_result))
             .await?;
     } else {
         ctx.say(format!(
@@ -926,7 +896,7 @@ async fn terminate(
         .await?
         {
             interaction
-                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                .create_followup(&ctx, default_auth_fail_response())
                 .await?;
             return Ok(());
         }
@@ -940,10 +910,7 @@ async fn terminate(
             Ok(lock) => lock,
             Err(_) => {
                 interaction
-                    .create_followup_message(ctx, |m| {
-                        m.ephemeral(true)
-                            .content("Failed sending command to bothub.")
-                    })
+                    .create_followup(ctx, fail_sending_cmd_followup())
                     .await?;
                 return Ok(());
             }
@@ -965,10 +932,7 @@ async fn terminate(
         drop(stdio_lock);
 
         interaction
-            .create_followup_message(ctx, |m| {
-                m.ephemeral(true)
-                    .content(format!("Result:\n```\n{}```", command_result))
-            })
+            .create_followup(ctx, result_followup(&command_result))
             .await?;
     } else {
         ctx.say(format!(
@@ -1000,7 +964,7 @@ async fn conclude(
         .await?
         {
             interaction
-                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                .create_followup(&ctx, default_auth_fail_response())
                 .await?;
             return Ok(());
         }
@@ -1014,10 +978,7 @@ async fn conclude(
             Ok(lock) => lock,
             Err(_) => {
                 interaction
-                    .create_followup_message(ctx, |m| {
-                        m.ephemeral(true)
-                            .content("Failed sending command to bothub.")
-                    })
+                    .create_followup(ctx, fail_sending_cmd_followup())
                     .await?;
                 return Ok(());
             }
@@ -1071,7 +1032,7 @@ async fn wait(
         .await?
         {
             interaction
-                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                .create_followup(&ctx, default_auth_fail_response())
                 .await?;
             return Ok(());
         }
@@ -1085,10 +1046,7 @@ async fn wait(
             Ok(lock) => lock,
             Err(_) => {
                 interaction
-                    .create_followup_message(ctx, |m| {
-                        m.ephemeral(true)
-                            .content("Failed sending command to bothub.")
-                    })
+                    .create_followup(ctx, fail_sending_cmd_followup())
                     .await?;
                 return Ok(());
             }
@@ -1137,7 +1095,7 @@ async fn finish(
         .await?
         {
             interaction
-                .create_followup_message(&ctx, |msg| msg.ephemeral(true).content("Nope!\n"))
+                .create_followup(&ctx, default_auth_fail_response())
                 .await?;
             return Ok(());
         }
@@ -1151,10 +1109,7 @@ async fn finish(
             Ok(lock) => lock,
             Err(_) => {
                 interaction
-                    .create_followup_message(ctx, |m| {
-                        m.ephemeral(true)
-                            .content("Failed sending command to bothub.")
-                    })
+                    .create_followup(ctx, fail_sending_cmd_followup())
                     .await?;
                 return Ok(());
             }
@@ -1192,19 +1147,17 @@ async fn finish(
 /// kill the control bot (hey that's me), then attempt to restart it
 #[poise::command(slash_command, prefix_command, rename = "control-restart")]
 async fn control_restart(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.send(|msg| {
-        msg.content("Click to RESTART the bot")
+    let ctrl_restart_component: Vec<serenity::CreateActionRow> = vec![
+        serenity::CreateActionRow::Buttons(vec![serenity::CreateButton::new("ctrl_restart.btn")
+            .style(serenity::ButtonStyle::Danger)
+            .label("RESTART")]),
+    ];
+    ctx.send(
+        poise::CreateReply::default()
+            .content("Click to RESTART the bot")
             .ephemeral(true)
-            .components(|comp| {
-                comp.create_action_row(|row| {
-                    row.create_button(|btn| {
-                        btn.custom_id("ctrl_restart.btn")
-                            .style(serenity::ButtonStyle::Danger)
-                            .label("RESTART")
-                    })
-                })
-            })
-    })
+            .components(ctrl_restart_component),
+    )
     .await?;
     Ok(())
 }
@@ -1215,32 +1168,38 @@ pub async fn ctrl_restart_btn_handler<'a>(
 ) -> Result<(), Error> {
     if !auth::authenticate(&ctx, &interaction, "ctrl_restart").await? {
         interaction
-            .create_followup_message(&ctx, |msg| {
-                msg.ephemeral(true)
-                    .content("Don't even try to stop me lol\n")
-            })
+            .create_followup(
+                &ctx,
+                serenity::CreateInteractionResponseFollowup::new()
+                    .ephemeral(true)
+                    .content("Don't even try to stop me lol\n"),
+            )
             .await?;
         Ok(())
     } else {
         interaction
-            .create_followup_message(&ctx, |msg| {
-                msg.ephemeral(true)
-                    .content("Restarting the bot in 5 seconds...")
-            })
+            .create_followup(
+                &ctx,
+                serenity::CreateInteractionResponseFollowup::new()
+                    .ephemeral(true)
+                    .content("Restarting the bot in 5 seconds..."),
+            )
             .await?;
         eprintln!("Restarting the bot in 5 seconds...");
         eprintln!("Triggered by {}", interaction.user());
-        ctx.set_presence(None, serenity::OnlineStatus::DoNotDisturb)
-            .await;
+        ctx.set_presence(None, serenity::OnlineStatus::DoNotDisturb);
         tokio::time::sleep(Duration::from_secs(5)).await;
         eprintln!("Stopping the bot...");
         match ctx.data.read().await.get::<ShardManagerContainer>() {
             Some(v) => v,
             None => {
                 interaction
-                    .create_followup_message(&ctx, |msg| {
-                        msg.ephemeral(true).content("Failed stopping the bot...")
-                    })
+                    .create_followup(
+                        &ctx,
+                        serenity::CreateInteractionResponseFollowup::new()
+                            .ephemeral(true)
+                            .content("Failed stopping the bot..."),
+                    )
                     .await?;
                 eprintln!("Failed stopping the bot...");
                 return Ok(());
