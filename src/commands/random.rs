@@ -25,20 +25,18 @@ pub async fn say(
                     something
                 }
                 None => {
+                    let say_submit_component = vec![serenity::CreateActionRow::Buttons(vec![
+                        serenity::CreateButton::new("say.submit_btn")
+                            .style(serenity::ButtonStyle::Primary)
+                            .label("submit a message"),
+                    ])];
                     let reply = ctx
-                        .send(|msg| {
-                            msg.content("Click this button to provide a message to be sent")
+                        .send(
+                            poise::CreateReply::default()
+                                .content("Click this button to provide a message to be sent")
                                 .ephemeral(true)
-                                .components(|comp| {
-                                    comp.create_action_row(|row| {
-                                        row.create_button(|btn| {
-                                            btn.custom_id("say.submit_btn")
-                                                .style(serenity::ButtonStyle::Primary)
-                                                .label("submit a message")
-                                        })
-                                    })
-                                })
-                        })
+                                .components(say_submit_component),
+                        )
                         .await?;
                     let react = match reply
                         .message()
@@ -49,45 +47,45 @@ pub async fn say(
                     {
                         Some(react) => react,
                         None => {
-                            reply.edit(ctx, |m| m.components(|c| c)).await?;
+                            reply
+                                .edit(ctx, poise::CreateReply::default().components(vec![]))
+                                .await?;
                             return Ok(());
                         }
                     };
-                    reply.edit(ctx, |m| m.components(|c| c)).await?;
+                    reply
+                        .edit(ctx, poise::CreateReply::default().components(vec![]))
+                        .await?;
                     if react.user.id != ctx.author().id {
                         react
-                            .create_interaction_response(&ctx, |response| {
-                                response
-                                    .kind(
-                                        serenity::InteractionResponseType::ChannelMessageWithSource,
-                                    )
-                                    .interaction_response_data(|msg| {
-                                        msg.ephemeral(true).content("Type your own command!")
-                                    })
-                            })
+                            .create_response(
+                                &ctx,
+                                serenity::CreateInteractionResponse::Message(
+                                    serenity::CreateInteractionResponseMessage::new()
+                                        .ephemeral(true)
+                                        .content("Type your own command!"),
+                                ),
+                            )
                             .await?;
                         return Ok(());
                     }
+                    let say_modal_components = vec![serenity::CreateActionRow::InputText(
+                        serenity::CreateInputText::new(
+                            serenity::InputTextStyle::Paragraph,
+                            "message",
+                            "say.modal.answer",
+                        )
+                        .required(true)
+                        .max_length(2000),
+                    )];
                     react
-                        .create_interaction_response(&ctx, |response| {
-                            response
-                                .kind(serenity::InteractionResponseType::Modal)
-                                .interaction_response_data(|d| {
-                                    d.custom_id("say.modal")
-                                        .title("message to be said")
-                                        .components(|component| {
-                                            component.create_action_row(|ar| {
-                                                ar.create_input_text(|it| {
-                                                    it.style(serenity::InputTextStyle::Paragraph)
-                                                        .required(true)
-                                                        .max_length(2000)
-                                                        .custom_id("say.modal.answer")
-                                                        .label("message")
-                                                })
-                                            })
-                                        })
-                                })
-                        })
+                        .create_response(
+                            &ctx,
+                            serenity::CreateInteractionResponse::Modal(
+                                serenity::CreateModal::new("say.modal", "message to be said")
+                                    .components(say_modal_components),
+                            ),
+                        )
                         .await?;
 
                     let react = match reply
@@ -108,27 +106,28 @@ pub async fn say(
                             &react.data.components[0].components[0]
                         {
                             react
-                                    .create_interaction_response(&ctx, |response| {
-                                        response
-                                    .kind(
-                                        serenity::InteractionResponseType::ChannelMessageWithSource,
-                                    )
-                                    .interaction_response_data(|msg| msg.ephemeral(true).content("Your message is being sent..."))
-                                    })
-                                    .await?;
-                            text.value.clone()
+                                .create_response(
+                                    &ctx,
+                                    serenity::CreateInteractionResponse::Message(
+                                        serenity::CreateInteractionResponseMessage::new()
+                                            .ephemeral(true)
+                                            .content("Your message is being sent..."),
+                                    ),
+                                )
+                                .await?;
+                            text.value.as_ref().unwrap_or(&String::default()).clone()
                         } else {
                             unreachable!();
                         }
                     } else {
                         react
-                            .create_interaction_response(&ctx, |response| {
-                                response
-                                    .kind(
-                                        serenity::InteractionResponseType::ChannelMessageWithSource,
-                                    )
-                                    .interaction_response_data(|msg| msg.content("No cheating!"))
-                            })
+                            .create_response(
+                                &ctx,
+                                serenity::CreateInteractionResponse::Message(
+                                    serenity::CreateInteractionResponseMessage::new()
+                                        .content("No cheating!"),
+                                ),
+                            )
                             .await?;
                         return Ok(());
                     }
@@ -136,7 +135,7 @@ pub async fn say(
             };
 
             ctx.channel_id()
-                .send_message(ctx, |m| m.content(&something))
+                .send_message(ctx, serenity::CreateMessage::new().content(&something))
                 .await?;
             Ok(())
         }
@@ -144,7 +143,7 @@ pub async fn say(
             let something = something.unwrap_or("something".to_string());
             prefix_context.msg.delete(ctx).await?;
             ctx.channel_id()
-                .send_message(ctx, |m| m.content(&something))
+                .send_message(ctx, serenity::CreateMessage::new().content(&something))
                 .await?;
             Ok(())
         }

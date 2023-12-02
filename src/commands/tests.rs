@@ -13,22 +13,9 @@ pub async fn ask(
                         the mysterious stdin to answer?"]
     count: Option<u32>,
 ) -> Result<(), Error> {
-    let interaction = match ctx {
-        Application(application) => match application.interaction {
-            poise::ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(interaction) => {
-                interaction
-            }
-            _ => unreachable!(),
-        },
-        _ => unreachable!(),
-    };
+    let interaction = slash_ctx_as_responsibe_interaction(&ctx);
     let count = count.unwrap_or(1);
-    let auth_result = auth::authenticate(
-        ctx.serenity_context(),
-        &ResponsibleInteraction::ApplicationCommand(interaction),
-        "ask",
-    )
-    .await?;
+    let auth_result = auth::authenticate(ctx.serenity_context(), &interaction, "ask").await?;
     let stdin_response = if auth_result {
         let mut stdin_response = String::new();
         let stdio_lock = tokio::time::timeout(
@@ -71,12 +58,15 @@ pub async fn ask(
         "*The mysterious stdin didn't answer...*".to_string()
     };
     interaction
-        .create_followup_message(ctx, |message| {
-            message.ephemeral(true).content(format!(
-                "*Message from the mysterious stdin:*\n\n{}",
-                stdin_response
-            ))
-        })
+        .create_followup(
+            ctx,
+            serenity::CreateInteractionResponseFollowup::new()
+                .ephemeral(true)
+                .content(format!(
+                    "*Message from the mysterious stdin:*\n\n{}",
+                    stdin_response
+                )),
+        )
         .await?;
     Ok(())
 }
@@ -89,18 +79,10 @@ pub async fn msg(
     #[rest]
     something: String,
 ) -> Result<(), Error> {
-    let interaction = match ctx {
-        Application(application) => match application.interaction {
-            poise::ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(interaction) => {
-                interaction
-            }
-            _ => unreachable!(),
-        },
-        _ => unreachable!(),
-    };
+    let interaction = slash_ctx_as_responsibe_interaction(&ctx);
     let auth_result = auth::authenticate(
         ctx.serenity_context(),
-        &ResponsibleInteraction::ApplicationCommand(interaction),
+        &interaction,
         format!("msg_{}", &something).as_str(),
     )
     .await?;
@@ -121,7 +103,12 @@ pub async fn msg(
         "*The mysterous stdin refused to listen to you...*"
     };
     interaction
-        .create_followup_message(ctx, |message| message.ephemeral(true).content(response))
+        .create_followup(
+            ctx,
+            serenity::CreateInteractionResponseFollowup::new()
+                .ephemeral(true)
+                .content(response),
+        )
         .await?;
     Ok(())
 }
@@ -134,19 +121,11 @@ pub async fn getline(
                         from the mysterious stdin?"]
     count: Option<u32>,
 ) -> Result<(), Error> {
-    let interaction = match ctx {
-        Application(application) => match application.interaction {
-            poise::ApplicationCommandOrAutocompleteInteraction::ApplicationCommand(interaction) => {
-                interaction
-            }
-            _ => unreachable!(),
-        },
-        _ => unreachable!(),
-    };
+    let interaction = slash_ctx_as_responsibe_interaction(&ctx);
     let count = count.unwrap_or(1);
     let auth_result = auth::authenticate(
         ctx.serenity_context(),
-        &ResponsibleInteraction::ApplicationCommand(interaction),
+        &interaction,
         format!("getline_{}", count).as_str(),
     )
     .await?;
@@ -163,11 +142,12 @@ pub async fn getline(
             let mut stdin_response = String::new();
             for i in 0..count {
                 interaction
-                    .create_followup_message(ctx, |message| {
-                        message
+                    .create_followup(
+                        ctx,
+                        serenity::CreateInteractionResponseFollowup::new()
                             .ephemeral(true)
-                            .content(format!("Getting message(s) from stdin...{}", i + 1))
-                    })
+                            .content(format!("Getting message(s) from stdin...{}", i + 1)),
+                    )
                     .await?;
 
                 stdin_response.push_str(&loop {
@@ -183,7 +163,12 @@ pub async fn getline(
             stdin_response
         };
         interaction
-            .create_followup_message(ctx, |message| message.ephemeral(true).content(&response))
+            .create_followup(
+                ctx,
+                serenity::CreateInteractionResponseFollowup::new()
+                    .ephemeral(true)
+                    .content(&response),
+            )
             .await?;
     }
     Ok(())
@@ -194,19 +179,17 @@ pub async fn getline(
 pub async fn test_input(ctx: Context<'_>) -> Result<(), Error> {
     let number_a = rand::thread_rng().gen_range(1000..10000);
     let number_b = rand::thread_rng().gen_range(1000..10000);
+    let test_input_component = vec![serenity::CreateActionRow::Buttons(vec![
+        serenity::CreateButton::new("test_input.submit_btn")
+            .style(serenity::ButtonStyle::Primary)
+            .label("submit an answer"),
+    ])];
     let reply = ctx
-        .send(|msg| {
-            msg.content(format!("{} + {} = ?", number_a, number_b))
-                .components(|comp| {
-                    comp.create_action_row(|row| {
-                        row.create_button(|btn| {
-                            btn.custom_id("test_input.submit_btn")
-                                .style(serenity::ButtonStyle::Primary)
-                                .label("submit an answer")
-                        })
-                    })
-                })
-        })
+        .send(
+            poise::CreateReply::default()
+                .content(format!("{} + {} = ?", number_a, number_b))
+                .components(test_input_component),
+        )
         .await?;
 
     let mut msg = reply.into_message().await?;
@@ -217,30 +200,33 @@ pub async fn test_input(ctx: Context<'_>) -> Result<(), Error> {
     {
         Some(react) => react,
         None => {
-            msg.edit(&ctx, |m| m.components(|c| c)).await?;
+            msg.edit(&ctx, serenity::EditMessage::new().components(vec![]))
+                .await?;
             return Ok(());
         }
     };
-    msg.edit(&ctx, |m| m.components(|c| c)).await?;
+    msg.edit(&ctx, serenity::EditMessage::new().components(vec![]))
+        .await?;
+    let test_input_modal_component = vec![serenity::CreateActionRow::InputText(
+        serenity::CreateInputText::new(
+            serenity::InputTextStyle::Short,
+            "test_input.modal.answer",
+            "answer",
+        )
+        .required(true),
+    )];
     if react.user.id == ctx.author().id {
         react
-            .create_interaction_response(&ctx, |r| {
-                r.kind(serenity::InteractionResponseType::Modal)
-                    .interaction_response_data(|d| {
-                        d.custom_id("test_input.modal")
-                            .title(format!("{number_a}+{number_b} = ?"))
-                            .components(|component| {
-                                component.create_action_row(|ar| {
-                                    ar.create_input_text(|it| {
-                                        it.style(serenity::InputTextStyle::Short)
-                                            .required(true)
-                                            .custom_id("test_input.modal.answer")
-                                            .label("answer")
-                                    })
-                                })
-                            })
-                    })
-            })
+            .create_response(
+                &ctx,
+                serenity::CreateInteractionResponse::Modal(
+                    serenity::CreateModal::new(
+                        "test_input.modal",
+                        format!("{number_a}+{number_b} = ?"),
+                    )
+                    .components(test_input_modal_component),
+                ),
+            )
             .await?;
 
         match msg
@@ -253,41 +239,45 @@ pub async fn test_input(ctx: Context<'_>) -> Result<(), Error> {
                     if let serenity::ActionRowComponent::InputText(text) =
                         &react.data.components[0].components[0]
                     {
-                        if let Ok(answer) = text.value.trim().parse::<u32>() {
+                        if let Ok(answer) = text
+                            .value
+                            .as_ref()
+                            .unwrap_or(&String::default())
+                            .trim()
+                            .parse::<u32>()
+                        {
                             if answer == number_a + number_b {
                                 react
-                                    .create_interaction_response(&ctx, |response| {
-                                        response
-                                    .kind(
-                                        serenity::InteractionResponseType::ChannelMessageWithSource,
+                                    .create_response(
+                                        &ctx,
+                                        serenity::CreateInteractionResponse::Message(
+                                            serenity::CreateInteractionResponseMessage::new()
+                                                .content("Nice"),
+                                        ),
                                     )
-                                    .interaction_response_data(|msg| msg.content("Nice"))
-                                    })
                                     .await?;
                                 Ok(())
                             } else {
                                 react
-                                    .create_interaction_response(&ctx, |response| {
-                                        response
-                                    .kind(
-                                        serenity::InteractionResponseType::ChannelMessageWithSource,
+                                    .create_response(
+                                        &ctx,
+                                        serenity::CreateInteractionResponse::Message(
+                                            serenity::CreateInteractionResponseMessage::new()
+                                                .content("Stoopid"),
+                                        ),
                                     )
-                                    .interaction_response_data(|msg| msg.content("Stoopid"))
-                                    })
                                     .await?;
                                 Ok(())
                             }
                         } else {
                             react
-                                .create_interaction_response(&ctx, |response| {
-                                    response
-                                    .kind(
-                                        serenity::InteractionResponseType::ChannelMessageWithSource,
-                                    )
-                                    .interaction_response_data(|msg| {
-                                        msg.content("Can't you type number properly?")
-                                    })
-                                })
+                                .create_response(
+                                    &ctx,
+                                    serenity::CreateInteractionResponse::Message(
+                                        serenity::CreateInteractionResponseMessage::new()
+                                            .content("Can't you type number properly?"),
+                                    ),
+                                )
                                 .await?;
                             Ok(())
                         }
@@ -296,29 +286,37 @@ pub async fn test_input(ctx: Context<'_>) -> Result<(), Error> {
                     }
                 } else {
                     react
-                        .create_interaction_response(&ctx, |response| {
-                            response
-                                .kind(serenity::InteractionResponseType::ChannelMessageWithSource)
-                                .interaction_response_data(|msg| msg.content("No cheating!"))
-                        })
+                        .create_response(
+                            &ctx,
+                            serenity::CreateInteractionResponse::Message(
+                                serenity::CreateInteractionResponseMessage::new()
+                                    .content("No cheating!"),
+                            ),
+                        )
                         .await?;
                     Ok(())
                 }
             }
             None => {
                 react
-                    .create_followup_message(&ctx, |msg| msg.content("You're thinking too slow"))
+                    .create_followup(
+                        &ctx,
+                        serenity::CreateInteractionResponseFollowup::new()
+                            .content("You're thinking too slow"),
+                    )
                     .await?;
                 Ok(())
             }
         }
     } else {
         react
-            .create_interaction_response(&ctx, |response| {
-                response
-                    .kind(serenity::InteractionResponseType::ChannelMessageWithSource)
-                    .interaction_response_data(|msg| msg.content("Type your own command!"))
-            })
+            .create_response(
+                &ctx,
+                serenity::CreateInteractionResponse::Message(
+                    serenity::CreateInteractionResponseMessage::new()
+                        .content("Type your own command!"),
+                ),
+            )
             .await?;
         Ok(())
     }
@@ -327,17 +325,16 @@ pub async fn test_input(ctx: Context<'_>) -> Result<(), Error> {
 /// Test function that require authentication
 #[poise::command(slash_command)]
 pub async fn test_auth(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.send(|msg| {
-        msg.content("Click to authenticate").components(|comp| {
-            comp.create_action_row(|row| {
-                row.create_button(|btn| {
-                    btn.custom_id("test_auth.auth_btn")
-                        .style(serenity::ButtonStyle::Primary)
-                        .label("Authenticate!")
-                })
-            })
-        })
-    })
+    let auth_test_components = vec![serenity::CreateActionRow::Buttons(vec![
+        serenity::CreateButton::new("test_auth.auth_btn")
+            .style(serenity::ButtonStyle::Primary)
+            .label("Authenticate!"),
+    ])];
+    ctx.send(
+        poise::CreateReply::default()
+            .content("Click to authenticate")
+            .components(auth_test_components),
+    )
     .await?;
     Ok(())
 }
@@ -348,11 +345,17 @@ pub async fn test_auth_btn_handler<'a>(
 ) -> Result<(), Error> {
     if auth::authenticate(ctx, &interaction, "test_auth").await? {
         interaction
-            .create_followup_message(&ctx, |msg| msg.content("(ᗜˬᗜ)"))
+            .create_followup(
+                &ctx,
+                serenity::CreateInteractionResponseFollowup::new().content("(ᗜˬᗜ)"),
+            )
             .await?;
     } else {
         interaction
-            .create_followup_message(&ctx, |msg| msg.content("(ᗜ˰ᗜ)"))
+            .create_followup(
+                &ctx,
+                serenity::CreateInteractionResponseFollowup::new().content("(ᗜ˰ᗜ)"),
+            )
             .await?;
     }
     return Ok(());
