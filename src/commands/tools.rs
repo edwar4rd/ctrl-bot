@@ -265,8 +265,6 @@ pub async fn stop_btn_handler<'a>(
                 return Ok(());
             }
         }
-        .lock()
-        .await
         .shutdown_all()
         .await;
         Ok(())

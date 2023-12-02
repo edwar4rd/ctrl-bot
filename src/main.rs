@@ -3,15 +3,15 @@ use ctrl_bot::prelude::*;
 #[cfg(feature = "handler")]
 async fn handler(
     ctx: &serenity::Context,
-    event: &poise::Event<'_>,
+    event: &serenity::FullEvent,
     _data: &Data,
 ) -> Result<(), Error> {
     match event {
-        poise::Event::InteractionCreate { interaction } => match interaction.kind() {
-            serenity::InteractionType::MessageComponent => {
+        serenity::FullEvent::InteractionCreate { interaction } => match interaction.kind() {
+            serenity::InteractionType::Component => {
                 let interaction = interaction.clone().message_component().unwrap();
-                match interaction.data.component_type {
-                    serenity::ComponentType::Button => {
+                match interaction.data.kind {
+                    serenity::ComponentInteractionDataKind::Button => {
                         #[cfg(feature = "modal_tests")]
                         if interaction.data.custom_id == "test_auth.auth_btn" {
                             commands::tests::test_auth_btn_handler(
@@ -110,35 +110,41 @@ async fn main() {
         options.event_handler = |ctx, event, _framework, data| Box::pin(handler(ctx, event, data));
     }
 
-    let framework = poise::Framework::builder()
-        .options(options)
-        .token(std::env::var("DISCORD_TOKEN").expect("missing DISCORD_TOKEN"))
-        .intents(serenity::GatewayIntents::non_privileged())
-        .setup(move |ctx, _ready, framework| {
-            Box::pin(async move {
-                poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                ctx.set_presence(
-                    Some(serenity::Activity::watching("分科倒數多少天 👀")),
-                    serenity::OnlineStatus::Idle,
-                )
-                .await;
-                ctx.data
-                    .write()
-                    .await
-                    .insert::<ShardManagerContainer>(std::sync::Arc::clone(
-                        &framework.shard_manager(),
-                    ));
-                Ok(Data {
-                    stdio_lock: tokio::sync::Mutex::new(()),
-                    stdin_linereader: tokio::sync::Mutex::new(tokio_util::codec::FramedRead::new(
-                        tokio::io::stdin(),
-                        tokio_util::codec::LinesCodec::new(),
-                    )),
+    let framework =
+        poise::Framework::builder()
+            .options(options)
+            .setup(move |ctx, _ready, framework| {
+                Box::pin(async move {
+                    poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                    ctx.set_presence(
+                        Some(serenity::ActivityData::watching("分科倒數多少天 👀")),
+                        serenity::OnlineStatus::Idle,
+                    );
+                    ctx.data
+                        .write()
+                        .await
+                        .insert::<ShardManagerContainer>(framework.shard_manager().clone());
+                    Ok(Data {
+                        stdio_lock: tokio::sync::Mutex::new(()),
+                        stdin_linereader: tokio::sync::Mutex::new(
+                            tokio_util::codec::FramedRead::new(
+                                tokio::io::stdin(),
+                                tokio_util::codec::LinesCodec::new(),
+                            ),
+                        ),
+                    })
                 })
-            })
-        });
+            });
 
-    framework.run().await.unwrap();
+    let token = std::env::var("DISCORD_TOKEN").expect("missing DISCORD_TOKEN");
+    let intents = serenity::GatewayIntents::non_privileged();
+
+    let client = serenity::ClientBuilder::new(token, intents)
+        .framework(framework.build())
+        .await;
+
+    client.unwrap().start().await.unwrap();
+
     eprintln!(
         "Bot stopped at {}...",
         std::time::SystemTime::now()

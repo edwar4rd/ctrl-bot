@@ -31,7 +31,7 @@ pub mod prelude {
     pub struct ShardManagerContainer;
 
     impl serenity::prelude::TypeMapKey for ShardManagerContainer {
-        type Value = std::sync::Arc<tokio::sync::Mutex<serenity::ShardManager>>;
+        type Value = std::sync::Arc<serenity::ShardManager>;
     }
 
     pub fn slash_ctx_as_responsibe_interaction<'a>(

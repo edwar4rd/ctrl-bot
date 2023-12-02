@@ -1205,8 +1205,6 @@ pub async fn ctrl_restart_btn_handler<'a>(
                 return Ok(());
             }
         }
-        .lock()
-        .await
         .shutdown_all()
         .await;
         println!("control-restart");
