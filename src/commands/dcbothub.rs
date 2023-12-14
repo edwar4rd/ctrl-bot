@@ -28,6 +28,7 @@ fn result_followup(result: &str) -> serenity::CreateInteractionResponseFollowup 
         "status",
         "task_status",
         "clean",
+        "clean_all",
         "build",
         "pull",
         "start",
@@ -344,7 +345,7 @@ async fn task_status(
     Ok(())
 }
 
-/// perform a `cargo clean` at the repo of a bot
+/// perform a `cargo clean` at the repo of a bot without removing the executable
 #[poise::command(slash_command)]
 async fn clean(
     ctx: Context<'_>,
@@ -386,6 +387,74 @@ async fn clean(
         let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
         let command_result = {
             println!("clean {}", botname);
+            stdin_reader
+                .next()
+                .await
+                .unwrap()
+                .unwrap()
+                .parse::<u32>()
+                .unwrap();
+            stdin_reader.next().await.unwrap().unwrap()
+        };
+        drop(stdin_reader);
+        drop(stdio_lock);
+
+        interaction
+            .create_followup(ctx, result_followup(&command_result))
+            .await?;
+    } else {
+        ctx.say(format!(
+            "Bot\n```\n{}\n```isn't found in bot list and is filtered for security reasons.",
+            botname
+        ))
+        .await?;
+    }
+
+    Ok(())
+}
+
+/// perform a `cargo clean` at the repo of a bot
+#[poise::command(slash_command, rename = "clean-all")]
+async fn clean_all(
+    ctx: Context<'_>,
+    #[description = "Name of the bot of interest"]
+    #[autocomplete = "autocomplete_botname"]
+    botname: String,
+) -> Result<(), Error> {
+    let candidates = autocomplete_botname(ctx, "").await;
+    if candidates.iter().any(|name| *name == botname) {
+        let interaction = slash_ctx_as_responsibe_interaction(&ctx);
+        if !auth::authenticate(
+            ctx.serenity_context(),
+            &interaction,
+            &format!("bothub_cleanall_{botname}"),
+        )
+        .await?
+        {
+            interaction
+                .create_followup(&ctx, default_auth_fail_response())
+                .await?;
+            return Ok(());
+        }
+
+        let stdio_lock = match timeout(
+            tokio::time::Duration::from_secs(30),
+            ctx.data().stdio_lock.lock(),
+        )
+        .await
+        {
+            Ok(lock) => lock,
+            Err(_) => {
+                interaction
+                    .create_followup(ctx, fail_sending_cmd_followup())
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        let mut stdin_reader = ctx.data().stdin_linereader.lock().await;
+        let command_result = {
+            println!("clean-all {}", botname);
             stdin_reader
                 .next()
                 .await
