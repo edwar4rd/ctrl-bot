@@ -74,7 +74,7 @@ async fn list(ctx: Context<'_>) -> Result<(), Error> {
     let bot_list = stdin_reader.next().await.unwrap().unwrap();
     if bot_list != "" {
         ctx.say(format!(
-            "Loaded bots: \n- `{}\n`",
+            "Loaded bots: \n- `{}`",
             bot_list.replace(' ', "`\n- `")
         ))
         .await?;
@@ -115,7 +115,7 @@ async fn list_existing(ctx: Context<'_>) -> Result<(), Error> {
     let bot_list = stdin_reader.next().await.unwrap().unwrap();
     if bot_list != "" {
         ctx.say(format!(
-            "Existing bots: \n- `{}\n`",
+            "Existing bots: \n- `{}`",
             bot_list.replace(' ', "`\n- `")
         ))
         .await?;
@@ -155,11 +155,8 @@ async fn list_executing(ctx: Context<'_>) -> Result<(), Error> {
         .unwrap();
     let task_list = stdin_reader.next().await.unwrap().unwrap();
     if task_list != "" {
-        ctx.say(format!(
-            "Tasks: \n- `{}\n`",
-            task_list.replace(' ', "`\n- `")
-        ))
-        .await?;
+        ctx.say(format!("Tasks: \n- `{}`", task_list.replace(' ', "`\n- `")))
+            .await?;
     } else {
         ctx.say("None").await?;
     }
