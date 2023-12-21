@@ -117,7 +117,7 @@ async fn main() {
                 Box::pin(async move {
                     poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                     ctx.set_presence(
-                        Some(serenity::ActivityData::watching("分科倒數多少天 👀")),
+                        Some(serenity::ActivityData::watching("學測倒數多少天 👀")),
                         serenity::OnlineStatus::Idle,
                     );
                     ctx.data
