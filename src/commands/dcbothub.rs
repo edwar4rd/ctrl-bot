@@ -251,7 +251,7 @@ async fn status(
     #[autocomplete = "autocomplete_ebotname"]
     botname: String,
 ) -> Result<(), Error> {
-    let candidates = autocomplete_ebotname(ctx, "").await;
+    let candidates = list_ebotname(ctx, "").await;
     if candidates.iter().any(|name| *name == botname) {
         let stdio_lock = match timeout(
             tokio::time::Duration::from_secs(30),
@@ -302,7 +302,7 @@ async fn task_status(
     #[autocomplete = "autocomplete_taskid"]
     taskid: String,
 ) -> Result<(), Error> {
-    let candidates = autocomplete_taskid(ctx, "").await;
+    let candidates = list_taskid(ctx, "").await;
     if candidates.iter().any(|name| *name == taskid) {
         let stdio_lock = match timeout(
             tokio::time::Duration::from_secs(30),
@@ -353,7 +353,7 @@ async fn clean(
     #[autocomplete = "autocomplete_botname"]
     botname: String,
 ) -> Result<(), Error> {
-    let candidates = autocomplete_botname(ctx, "").await;
+    let candidates = list_botname(ctx, "").await;
     if candidates.iter().any(|name| *name == botname) {
         let interaction = slash_ctx_as_responsibe_interaction(&ctx);
         if !auth::authenticate(
@@ -421,7 +421,7 @@ async fn clean_all(
     #[autocomplete = "autocomplete_botname"]
     botname: String,
 ) -> Result<(), Error> {
-    let candidates = autocomplete_botname(ctx, "").await;
+    let candidates = list_botname(ctx, "").await;
     if candidates.iter().any(|name| *name == botname) {
         let interaction = slash_ctx_as_responsibe_interaction(&ctx);
         if !auth::authenticate(
@@ -489,7 +489,7 @@ async fn build(
     #[autocomplete = "autocomplete_botname"]
     botname: String,
 ) -> Result<(), Error> {
-    let candidates = autocomplete_botname(ctx, "").await;
+    let candidates = list_botname(ctx, "").await;
     if candidates.iter().any(|name| *name == botname) {
         let interaction = slash_ctx_as_responsibe_interaction(&ctx);
         if !auth::authenticate(
@@ -557,7 +557,7 @@ async fn pull(
     #[autocomplete = "autocomplete_botname"]
     botname: String,
 ) -> Result<(), Error> {
-    let candidates = autocomplete_botname(ctx, "").await;
+    let candidates = list_botname(ctx, "").await;
     if candidates.iter().any(|name| *name == botname) {
         let interaction = slash_ctx_as_responsibe_interaction(&ctx);
         if !auth::authenticate(
@@ -625,7 +625,7 @@ async fn start(
     #[autocomplete = "autocomplete_botname"]
     botname: String,
 ) -> Result<(), Error> {
-    let candidates = autocomplete_botname(ctx, "").await;
+    let candidates = list_botname(ctx, "").await;
     if candidates.iter().any(|name| *name == botname) {
         let interaction = slash_ctx_as_responsibe_interaction(&ctx);
         if !auth::authenticate(
@@ -694,7 +694,7 @@ async fn msg(
     botname: String,
     #[description = "Message to send to the bot"] message: String,
 ) -> Result<(), Error> {
-    let candidates = autocomplete_ebotname(ctx, "").await;
+    let candidates = list_ebotname(ctx, "").await;
     if candidates.iter().any(|name| *name == botname) {
         let interaction = slash_ctx_as_responsibe_interaction(&ctx);
         if !auth::authenticate(
@@ -764,7 +764,7 @@ async fn verify(
 ) -> Result<(), Error> {
     match botname {
         Some(botname) => {
-            let candidates = autocomplete_botname(ctx, "").await;
+            let candidates = list_botname(ctx, "").await;
             if candidates.iter().any(|name| *name == botname) {
                 let interaction = slash_ctx_as_responsibe_interaction(&ctx);
                 if !auth::authenticate(
@@ -883,7 +883,7 @@ async fn kill(
     #[autocomplete = "autocomplete_ebotname"]
     botname: String,
 ) -> Result<(), Error> {
-    let candidates = autocomplete_ebotname(ctx, "").await;
+    let candidates = list_ebotname(ctx, "").await;
     if candidates.iter().any(|name| *name == botname) {
         let interaction = slash_ctx_as_responsibe_interaction(&ctx);
         if !auth::authenticate(
@@ -951,7 +951,7 @@ async fn terminate(
     #[autocomplete = "autocomplete_taskid"]
     taskid: String,
 ) -> Result<(), Error> {
-    let candidates = autocomplete_taskid(ctx, "").await;
+    let candidates = list_taskid(ctx, "").await;
     if candidates.iter().any(|name| *name == taskid) {
         let interaction = slash_ctx_as_responsibe_interaction(&ctx);
         if !auth::authenticate(
@@ -1019,7 +1019,7 @@ async fn conclude(
     #[autocomplete = "autocomplete_ebotname"]
     botname: String,
 ) -> Result<(), Error> {
-    let candidates = autocomplete_ebotname(ctx, "").await;
+    let candidates = list_ebotname(ctx, "").await;
     if candidates.iter().any(|name| *name == botname) {
         let interaction = slash_ctx_as_responsibe_interaction(&ctx);
         if !auth::authenticate(
@@ -1087,7 +1087,7 @@ async fn wait(
     #[autocomplete = "autocomplete_taskid"]
     taskid: String,
 ) -> Result<(), Error> {
-    let candidates = autocomplete_taskid(ctx, "").await;
+    let candidates = list_taskid(ctx, "").await;
     if candidates.iter().any(|name| *name == taskid) {
         let interaction = slash_ctx_as_responsibe_interaction(&ctx);
         if !auth::authenticate(
@@ -1150,7 +1150,7 @@ async fn finish(
     #[autocomplete = "autocomplete_taskid"]
     taskid: String,
 ) -> Result<(), Error> {
-    let candidates = autocomplete_taskid(ctx, "").await;
+    let candidates = list_taskid(ctx, "").await;
     if candidates.iter().any(|name| *name == taskid) {
         let interaction = slash_ctx_as_responsibe_interaction(&ctx);
         if !auth::authenticate(
@@ -1278,7 +1278,7 @@ pub async fn ctrl_restart_btn_handler<'a>(
     }
 }
 
-async fn autocomplete_botname<'a>(ctx: Context<'_>, partial: &'a str) -> Vec<String> {
+async fn list_botname<'a>(ctx: Context<'_>, partial: &'a str) -> Vec<String> {
     let bot_list = if let Ok(stdio_lock) = timeout(
         tokio::time::Duration::from_secs(30),
         ctx.data().stdio_lock.lock(),
@@ -1309,7 +1309,19 @@ async fn autocomplete_botname<'a>(ctx: Context<'_>, partial: &'a str) -> Vec<Str
         .collect::<Vec<String>>()
 }
 
-async fn autocomplete_ebotname<'a>(ctx: Context<'_>, partial: &'a str) -> Vec<String> {
+async fn autocomplete_botname<'a>(
+    ctx: Context<'_>,
+    partial: &'a str,
+) -> serenity::CreateAutocompleteResponse {
+    let choices = list_botname(ctx, partial)
+        .await
+        .into_iter()
+        .map(serenity::AutocompleteChoice::from)
+        .collect();
+    serenity::CreateAutocompleteResponse::new().set_choices(choices)
+}
+
+async fn list_ebotname<'a>(ctx: Context<'_>, partial: &'a str) -> Vec<String> {
     let bot_list = if let Ok(stdio_lock) = timeout(
         tokio::time::Duration::from_secs(30),
         ctx.data().stdio_lock.lock(),
@@ -1340,7 +1352,19 @@ async fn autocomplete_ebotname<'a>(ctx: Context<'_>, partial: &'a str) -> Vec<St
         .collect::<Vec<String>>()
 }
 
-async fn autocomplete_taskid<'a>(ctx: Context<'_>, partial: &'a str) -> Vec<String> {
+async fn autocomplete_ebotname<'a>(
+    ctx: Context<'_>,
+    partial: &'a str,
+) -> serenity::CreateAutocompleteResponse {
+    let choices = list_ebotname(ctx, partial)
+        .await
+        .into_iter()
+        .map(serenity::AutocompleteChoice::from)
+        .collect();
+    serenity::CreateAutocompleteResponse::new().set_choices(choices)
+}
+
+async fn list_taskid<'a>(ctx: Context<'_>, partial: &'a str) -> Vec<String> {
     let task_list = if let Ok(stdio_lock) = timeout(
         tokio::time::Duration::from_secs(30),
         ctx.data().stdio_lock.lock(),
@@ -1369,4 +1393,16 @@ async fn autocomplete_taskid<'a>(ctx: Context<'_>, partial: &'a str) -> Vec<Stri
         .filter(|name| name.starts_with(partial))
         .map(|name| name.to_string())
         .collect::<Vec<String>>()
+}
+
+async fn autocomplete_taskid<'a>(
+    ctx: Context<'_>,
+    partial: &'a str,
+) -> serenity::CreateAutocompleteResponse {
+    let choices = list_taskid(ctx, partial)
+        .await
+        .into_iter()
+        .map(serenity::AutocompleteChoice::from)
+        .collect();
+    serenity::CreateAutocompleteResponse::new().set_choices(choices)
 }

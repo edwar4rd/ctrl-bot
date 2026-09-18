@@ -2,10 +2,10 @@ use ctrl_bot::prelude::*;
 
 #[cfg(feature = "handler")]
 async fn handler(
-    ctx: &serenity::Context,
+    framework: poise::FrameworkContext<'_, Data, Error>,
     event: &serenity::FullEvent,
-    _data: &Data,
 ) -> Result<(), Error> {
+    let ctx = framework.serenity_context;
     match event {
         serenity::FullEvent::InteractionCreate { interaction } => match interaction.kind() {
             serenity::InteractionType::Component => {
@@ -96,7 +96,7 @@ async fn main() {
         commands.push(commands::shell::shell());
     }
 
-    commands.push(commands::help());
+    // commands.push(commands::help());
     commands.push(commands::botinfo());
 
     #[allow(unused_mut)]
@@ -107,7 +107,7 @@ async fn main() {
 
     #[cfg(feature = "handler")]
     {
-        options.event_handler = |ctx, event, _framework, data| Box::pin(handler(ctx, event, data));
+        options.event_handler = |framework, event| Box::pin(handler(framework, event));
     }
 
     let framework =

@@ -13,7 +13,7 @@ pub async fn authenticate<'a>(
     interaction: &ResponsibleInteraction<'a>,
     action_data: &str,
 ) -> Result<bool, Error> {
-    let challenge_random = iter::repeat_with(|| thread_rng().gen::<u8>())
+    let challenge_random = iter::repeat_with(|| rand::rng().random::<u8>())
         .take(192)
         .collect::<Vec<u8>>();
     let challenge_encoded = format!(
@@ -152,7 +152,7 @@ Dy7uxt3qNoJykUCNUqlNBNUCAwEAAQ==
 ",
             )
             .unwrap()
-            .verify(Pkcs1v15Sign::new::<Sha3_512>(), &hashed, &signed)
+            .verify(Pkcs1v15Sign::new_unprefixed(), &hashed, &signed)
             .is_ok()
             {
                 modal_reply_react

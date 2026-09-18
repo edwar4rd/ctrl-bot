@@ -1,19 +1,19 @@
 use crate::prelude::*;
 
-/// Show a help menu
-#[poise::command(slash_command, prefix_command)]
-pub async fn help(
-    ctx: Context<'_>,
-    #[description = "Specific command to show help about"] command: Option<String>,
-) -> Result<(), Error> {
-    poise::builtins::help(
-        ctx,
-        command.as_deref(),
-        poise::builtins::HelpConfiguration::default(),
-    )
-    .await?;
-    Ok(())
-}
+// /// Show a help menu
+// #[poise::command(slash_command, prefix_command)]
+// pub async fn help(
+//     ctx: Context<'_>,
+//     #[description = "Specific command to show help about"] command: Option<String>,
+// ) -> Result<(), Error> {
+//     poise::builtins::help(
+//         ctx,
+//         command.as_deref(),
+//         poise::builtins::HelpConfiguration::default(),
+//     )
+//     .await?;
+//     Ok(())
+// }
 
 /// Displays information about the bot
 #[poise::command(slash_command, prefix_command)]
